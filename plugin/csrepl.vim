@@ -8,8 +8,13 @@ if !exists('g:csrepl_eval_inline')
   let g:csrepl_eval_inline = 1
 endif
 
-if !exists('g:csrepl_use_commmand')
+if !exists('g:csrepl_use_command')
   let g:csrepl_use_command = 'csharp'
+endif
+
+if !executable(g:csrepl_use_command)
+  echoerr g:csrepl_use_command . ' is required but is not available.'
+  finish
 endif
 
 function! s:SendToRepl(data)
@@ -67,7 +72,7 @@ autocmd filetype cs command! -buffer FileToRepl :call s:FileToRepl()
 autocmd filetype cs command! -buffer LineToRepl :call s:LineToRepl()
 autocmd filetype cs command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
-autocmd BufWritePre *.cs silent! %s/\/\/\s\$csr.*//g
+autocmd BufWritePre *.cs silent! %s/\/\/=\s.*//g
 
 autocmd filetype cs nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype cs nnoremap <silent> cpf :FileToRepl<CR>
