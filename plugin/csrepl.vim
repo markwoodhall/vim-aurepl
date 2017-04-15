@@ -25,7 +25,7 @@ function! s:SelectionToRepl() range
   let old_regtype = getregtype('"')
   let old_clipboard = &clipboard
   set clipboard&
-  normal! ""gvy
+  silent normal! ""gvy
   let selection = getreg('"')
   call setreg('"', old_reg, old_regtype)
   let &clipboard = old_clipboard
@@ -65,7 +65,7 @@ endfunction
 autocmd filetype cs command! -buffer CsRepl :exe s:CsRepl()
 autocmd filetype cs command! -buffer FileToRepl :call s:FileToRepl()
 autocmd filetype cs command! -buffer LineToRepl :call s:LineToRepl()
-autocmd filetype cs command! -buffer -range SelectionToRepl :call s:SelectionToRepl()
+autocmd filetype cs command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
 autocmd BufWritePre *.cs silent! %s/\/\/\s\$csr.*//g
 
