@@ -35,8 +35,14 @@ function! s:SelectionToRepl() range
   call setreg('"', old_reg, old_regtype)
   let &clipboard = old_clipboard
   let out = s:SendToRepl([selection])
+  let lastline = getpos("'>")[1]
+  echomsg lastline
   for m in out
-    echomsg m
+    if g:csrepl_eval_inline
+       call setline(lastline, split(getline(lastline), ' //=')[0] .' //= '.m)
+    else
+       echomsg m
+    endif
   endfor
 endfunction
 
@@ -57,7 +63,11 @@ function! s:FileToRepl()
   call writefile(lines, 'scratch.temp.cs')
   let out = s:SendToRepl(lines)
   for m in out
-    echomsg m
+    if g:csrepl_eval_inline
+       call setline('$', split(lines[-1], ' //=')[0] .' //= '.m)
+    else
+       echomsg m
+    endif
   endfor
 endfunction
 
@@ -72,7 +82,8 @@ autocmd filetype cs command! -buffer FileToRepl :call s:FileToRepl()
 autocmd filetype cs command! -buffer LineToRepl :call s:LineToRepl()
 autocmd filetype cs command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
-autocmd BufWritePre *.cs silent! %s/\/\/=\s.*//g
+autocmd BufWritePre *.cs silent! %s/\s\/\/=\s.*//g
+autocmd BufLeave *.cs silent! %s/\s\/\/=\s.*//g
 
 autocmd filetype cs nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype cs nnoremap <silent> cpf :FileToRepl<CR>
