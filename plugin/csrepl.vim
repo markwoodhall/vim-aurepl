@@ -36,15 +36,15 @@ function! s:SelectionToRepl() range
 endfunction
 
 function! s:LineToRepl()
-  "let line = split(getline('.'), ' // $csr ')[0]
-  "let out = s:SendToRepl([line])
-  "for m in out
-  "    if g:csrepl_eval_inline
-  "        call setline('.', line .' // $csr '.m)
-  "    else
-  "        echomsg m
-  "    endif
-  "endfor
+  let line = split(getline('.'), ' // $csr ')[0]
+  let out = s:SendToRepl([line])
+  for m in out
+      if g:csrepl_eval_inline
+          call setline('.', line .' // $csr '.m)
+      else
+          echomsg m
+      endif
+  endfor
 endfunction
 
 function! s:FileToRepl()
