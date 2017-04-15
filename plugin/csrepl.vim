@@ -31,19 +31,19 @@ function! s:SelectionToRepl() range
   let &clipboard = old_clipboard
   let out = s:SendToRepl([selection])
   for m in out
-      echomsg m
+    echomsg m
   endfor
 endfunction
 
 function! s:LineToRepl()
-  let line = split(getline('.'), ' // $csr ')[0]
+  let line = split(getline('.'), ' // $csr')[0]
   let out = s:SendToRepl([line])
   for m in out
-      if g:csrepl_eval_inline
-          call setline('.', line .' // $csr '.m)
-      else
-          echomsg m
-      endif
+    if g:csrepl_eval_inline
+       call setline('.', line .' // $csr '.m)
+    else
+       echomsg m
+    endif
   endfor
 endfunction
 
@@ -52,7 +52,7 @@ function! s:FileToRepl()
   call writefile(lines, 'scratch.temp.cs')
   let out = s:SendToRepl(lines)
   for m in out
-      echomsg m
+    echomsg m
   endfor
 endfunction
 
@@ -63,13 +63,13 @@ function! s:CsRepl()
 endfunction
 
 autocmd filetype cs command! -buffer CsRepl :exe s:CsRepl()
-autocmd filetype cs command! -buffer FileToRepl :exe s:FileToRepl()
-autocmd filetype cs command! -buffer LineToRepl :exe s:LineToRepl()
-autocmd filetype cs command! -buffer -range SelectionToRepl :exe s:SelectionToRepl()
+autocmd filetype cs command! -buffer FileToRepl :call s:FileToRepl()
+autocmd filetype cs command! -buffer LineToRepl :call s:LineToRepl()
+autocmd filetype cs command! -buffer -range SelectionToRepl :call s:SelectionToRepl()
 
-"autocmd BufWritePre *.cs silent! %s/\/\/\s\$csr.*//g
+autocmd BufWritePre *.cs silent! %s/\/\/\s\$csr.*//g
 
-autocmd filetype cs nnoremap <buffer> <silent> csr :CsRepl<CR>
-autocmd filetype cs nnoremap <buffer> <silent> cpf :FileToRepl<CR>
-autocmd filetype cs nnoremap <buffer> <silent> cpp :LineToRepl<CR>
-autocmd filetype cs vnoremap <buffer> <silent> cpp :SelectionToRepl<CR>
+autocmd filetype cs nnoremap <silent> csr :CsRepl<CR>
+autocmd filetype cs nnoremap <silent> cpf :FileToRepl<CR>
+autocmd filetype cs nnoremap <silent> cpp :LineToRepl<CR>
+autocmd filetype cs vnoremap <silent> cpp :SelectionToRepl<CR>
