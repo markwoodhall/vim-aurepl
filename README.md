@@ -21,7 +21,7 @@ Plug 'markwoodhall/vim-csrepl'
 
 ## Configuration
 
-When you send a line to the repl the output of the command will appear inline, you can disable this with the following.
+When you send a something to the repl the output of the command will appear inline, you can disable this with the following.
 
 ```viml
 let g:csrepl_eval_inline = 0
@@ -33,18 +33,18 @@ let g:csrepl_eval_inline = 0
 :LineToRepl
 ```
 
-![line-to-repl](http://i.imgur.com/Qm1M5Q5.gif)
+![line-to-repl](http://i.imgur.com/1OQb1Dt.gif)
 
 ```viml
 :FileToRepl
 ```
 
-![file-to-repl](http://i.imgur.com/JvqG44U.gif)
+![file-to-repl](http://i.imgur.com/nb0aNJC.gif)
 
 ```viml
 :SelectionToRepl
 ```
-![selection-to-repl](http://i.imgur.com/8tg6VQ0.gif)
+![selection-to-repl](http://i.imgur.com/fD73U3g.gif)
 
 ## License
 Copyright © Mark Woodhall. Distributed under the same terms as Vim itself. See `:help license`
