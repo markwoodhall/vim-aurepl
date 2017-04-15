@@ -21,7 +21,7 @@ Plug 'markwoodhall/vim-csrepl'
 
 ## Configuration
 
-When you send a something to the repl the output of the command will appear inline, you can disable this with the following.
+When you send something to the repl the output of the command will appear inline, you can disable this with the following.
 
 ```viml
 let g:csrepl_eval_inline = 0
