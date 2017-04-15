@@ -36,11 +36,11 @@ function! s:SelectionToRepl() range
 endfunction
 
 function! s:LineToRepl()
-  let line = split(getline('.'), ' // $csr')[0]
+  let line = split(getline('.'), ' //=')[0]
   let out = s:SendToRepl([line])
   for m in out
     if g:csrepl_eval_inline
-       call setline('.', line .' // $csr '.m)
+       call setline('.', line .' //= '.m)
     else
        echomsg m
     endif
