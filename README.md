@@ -4,7 +4,7 @@ To enable repl integration in vim.
 
 ## Requirements
 
-At the moment this plugin requires the Mono C# repl, if at some point tbere is a better unerlying repl you can change the following.
+At the moment this plugin requires the Mono C# repl, if at some point there is a better underlying repl available you can change the following.
 
 ```viml
 let g:csrepl_use_command = 'somenewrepl'
