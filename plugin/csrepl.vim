@@ -18,7 +18,14 @@ if !executable(g:csrepl_use_command)
 endif
 
 function! s:SendToRepl(data)
-  call writefile(a:data, 'scratch.temp.cs')
+  let clean_data = []
+  for d in a:data
+    for line in split(d, '\n')
+      let clean = substitute(line, '\s\/\/=\s.*', '', 'g')
+      let clean_data = clean_data + [clean]
+    endfor
+  endfor
+  call writefile(clean_data, 'scratch.temp.cs')
   let out = system(g:csrepl_use_command . ' scratch.temp.cs')
   call delete('scratch.temp.cs')
   let out = split(out, '\n')
@@ -36,7 +43,6 @@ function! s:SelectionToRepl() range
   let &clipboard = old_clipboard
   let out = s:SendToRepl([selection])
   let lastline = getpos("'>")[1]
-  echomsg lastline
   for m in out
     if g:csrepl_eval_inline
        call setline(lastline, split(getline(lastline), ' //=')[0] .' //= '.m)
@@ -72,9 +78,9 @@ function! s:FileToRepl()
 endfunction
 
 function! s:CsRepl()
-  vsplit __cs_repl.cs
+  vsplit __cs_repl
     setlocal filetype=cs
-    call append(getline('$'), ['//~~~~~~~~ csharp repl buffer ~~~~~~~~//'])
+    setlocal readonly
 endfunction
 
 autocmd filetype cs command! -buffer CsRepl :exe s:CsRepl()
