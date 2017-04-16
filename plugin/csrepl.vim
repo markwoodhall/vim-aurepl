@@ -45,7 +45,7 @@ function! s:NotForOutput(line_number)
   let result = result && line !~ 'foreach.*(.*$'
   let result = result && line !~ 'while.*(.*$'
   let result = result && line !~ 'switch.*(.*$'
-  let result = result && line !~ 'do.*$' 
+  let result = result && line !~ 'do.*$'
   let result = result && line !~ 'for.*(.*$'
   let result = result && line !~ 'public.*$'
   let result = result && line !~ 'private.*$'
