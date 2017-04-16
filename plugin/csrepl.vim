@@ -32,6 +32,31 @@ function! s:SendToRepl(data)
   return out
 endfunction
 
+function! s:NotForOutput(line_number)
+  let line = split(getline(a:line_number), ' //=')
+  let prev_line = split(getline(a:line_number-1), ' //=')
+  let next_line =  split(getline(a:line_number+1), ' //=')
+
+  let line = len(line) == 0 ? '' : line[0]
+  let prev_line = len(prev_line) == 0 ? '' : prev_line[0]
+  let next_line = len(next_line) == 0 ? '' : next_line[0]
+
+  let result = line !~ 'var.*$'
+  let result = result && line !~ 'foreach.*(.*$'
+  let result = result && line !~ 'while.*(.*$'
+  let result = result && line !~ 'switch.*(.*$'
+  let result = result && line !~ 'do.*$' 
+  let result = result && line !~ 'for.*(.*$'
+  let result = result && line !~ 'public.*$'
+  let result = result && line !~ 'private.*$'
+  let result = result && line !~ 'Func<.*$'
+  let result = result && line !~ '{.*$'
+  let result = result && line !~ '}.*$'
+  let result = result && prev_line !~ '{.*$' && next_line !~ '}.*'
+  let result = result && next_line !~ '{.*'
+  return result
+endfunction
+
 function! s:SelectionToRepl() range
   let old_reg = getreg('"')
   let old_regtype = getregtype('"')
@@ -47,7 +72,7 @@ function! s:SelectionToRepl() range
   let counter = firstline
   for m in out
     if g:csrepl_eval_inline
-      while substitute(getline(counter), '\w', '', 'g') == ''
+      while counter < lastline && (substitute(getline(counter), '\w', '', 'g') == '' || !s:NotForOutput(counter))
         let counter = counter + 1
       endwhile
       call setline(counter, split(getline(counter), ' //=')[0] .' //= '.m)
@@ -79,7 +104,7 @@ function! s:FileToRepl()
   let counter = firstline
   for m in out
     if g:csrepl_eval_inline
-      while substitute(getline(counter), '\w', '', 'g') == ''
+      while counter < lastline && (substitute(getline(counter), '\w', '', 'g') == '' || !s:NotForOutput(counter))
         let counter = counter + 1
       endwhile
       call setline(counter, split(getline(counter), ' //=')[0] .' //= '.m)
