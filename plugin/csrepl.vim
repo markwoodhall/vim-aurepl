@@ -41,11 +41,12 @@ function! s:NotForOutput(line_number)
   let prev_line = len(prev_line) == 0 ? '' : prev_line[0]
   let next_line = len(next_line) == 0 ? '' : next_line[0]
 
-  let result = line !~ 'var.*$'
-  let result = result && line !~ 'foreach.*(.*$'
-  let result = result && line !~ 'while.*(.*$'
-  let result = result && line !~ 'switch.*(.*$'
-  let result = result && line !~ 'do.*$'
+  let result = line !~ 'var\s.*$'
+  let result = result && line !~ '\w.\s=\s.*$'
+  let result = result && (line !~ 'foreach.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
+  let result = result && (line !~ 'while.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
+  let result = result && (line !~ 'switch.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
+  let result = result && (line !~ 'do.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
   let result = result && line !~ 'for.*(.*$'
   let result = result && line !~ 'public.*$'
   let result = result && line !~ 'private.*$'
@@ -53,7 +54,6 @@ function! s:NotForOutput(line_number)
   let result = result && line !~ '{.*$'
   let result = result && line !~ '}.*$'
   let result = result && prev_line !~ '{.*$' && next_line !~ '}.*'
-  let result = result && next_line !~ '{.*'
   return result
 endfunction
 
