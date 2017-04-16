@@ -42,13 +42,19 @@ function! s:SelectionToRepl() range
   call setreg('"', old_reg, old_regtype)
   let &clipboard = old_clipboard
   let out = s:SendToRepl([selection])
+  let firstline = getpos("'<")[1]
   let lastline = getpos("'>")[1]
+  let counter = firstline
   for m in out
     if g:csrepl_eval_inline
-       call setline(lastline, split(getline(lastline), ' //=')[0] .' //= '.m)
+      while substitute(getline(counter), '\w', '', 'g') == ''
+        let counter = counter + 1
+      endwhile
+      call setline(counter, split(getline(counter), ' //=')[0] .' //= '.m)
     else
-       echomsg m
+      echomsg m
     endif
+    let counter = (counter < lastline) ? counter + 1 : counter
   endfor
 endfunction
 
@@ -68,12 +74,19 @@ function! s:FileToRepl()
   let lines = getline(0, '$')
   call writefile(lines, 'scratch.temp.cs')
   let out = s:SendToRepl(lines)
+  let firstline = 0
+  let lastline = line('$')
+  let counter = firstline
   for m in out
     if g:csrepl_eval_inline
-       call setline('$', split(lines[-1], ' //=')[0] .' //= '.m)
+      while substitute(getline(counter), '\w', '', 'g') == ''
+        let counter = counter + 1
+      endwhile
+      call setline(counter, split(getline(counter), ' //=')[0] .' //= '.m)
     else
        echomsg m
     endif
+    let counter = (counter < lastline) ? counter + 1 : counter
   endfor
 endfunction
 
