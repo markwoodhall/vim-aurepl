@@ -3,21 +3,16 @@ if exists('g:loaded_csrepl') || &cp
 endif
 
 let g:loaded_csrepl = 1
+let g:csrepl_node_command = 'node --eval "$(cat ./scratch.temp.cs)" --print'
+let g:csrepl_cs_command = 'csharp ./scratch.temp.cs'
 
 if !exists('g:csrepl_eval_inline')
   let g:csrepl_eval_inline = 1
 endif
 
-if !exists('g:csrepl_use_command')
-  let g:csrepl_use_command = 'csharp'
-endif
-
-if !executable(g:csrepl_use_command)
-  echoerr g:csrepl_use_command . ' is required but is not available.'
-  finish
-endif
-
 function! s:SendToRepl(data)
+
+  let binary = split(b:csrepl_use_command, ' ')[0]
   let clean_data = []
   for d in a:data
     for line in split(d, '\n')
@@ -26,7 +21,7 @@ function! s:SendToRepl(data)
     endfor
   endfor
   call writefile(clean_data, 'scratch.temp.cs')
-  let out = system(g:csrepl_use_command . ' scratch.temp.cs')
+  let out = system(b:csrepl_use_command)
   call delete('scratch.temp.cs')
   let out = split(out, '\n')
   return out
@@ -117,9 +112,14 @@ function! s:FileToRepl()
   endfor
 endfunction
 
-function! s:CsRepl()
-  vsplit __cs_repl
+function! s:Repl(repl_type)
+  execute 'vsplit __REPL-'.a:repl_type
     setlocal filetype=cs
+    let b:csrepl_use_command = g:csrepl_cs_command
+    if a:repl_type == 'javascript'
+      setlocal filetype=javascript
+      let b:csrepl_use_command = g:csrepl_node_command
+    endif
     setlocal readonly
 endfunction
 
@@ -146,6 +146,7 @@ function! s:Namespaces()
   execute command '__Namespaces'
     setlocal filetype=markdown
     setlocal buftype=nofile
+    let b:csrepl_use_command = g:csrepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
@@ -163,6 +164,7 @@ function! s:Types(namespace)
   execute command '__Namespaces'
     setlocal filetype=markdown
     setlocal buftype=nofile
+    let b:csrepl_use_command = g:csrepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
@@ -194,23 +196,39 @@ function! s:Functions(typename)
   execute command '__Namespaces'
     setlocal filetype=markdown
     setlocal buftype=nofile
+    let b:csrepl_use_command = g:csrepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
 endfunction
 
+autocmd filetype * command! -buffer CsRepl :exe s:Repl('cs')
+autocmd filetype * command! -buffer JsRepl :exe s:Repl('javascript')
+autocmd filetype * command! -buffer FileToRepl :call s:FileToRepl()
+autocmd filetype * command! -buffer LineToRepl :call s:LineToRepl()
+autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
+
 autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
-autocmd filetype cs command! -buffer CsRepl :exe s:CsRepl()
-autocmd filetype cs command! -buffer FileToRepl :call s:FileToRepl()
-autocmd filetype cs command! -buffer LineToRepl :call s:LineToRepl()
-autocmd filetype cs command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
-autocmd BufWritePre *.cs silent! %s/\s\/\/=\s.*//g
-autocmd BufLeave *.cs silent! %s/\s\/\/=\s.*//g
+autocmd BufWritePre *.cs,*.js silent! %s/\s\/\/=\s.*//g
+autocmd BufLeave *.cs,*.js silent! %s/\s\/\/=\s.*//g
 
-autocmd filetype cs nnoremap <silent> csr :CsRepl<CR>
-autocmd filetype cs nnoremap <silent> cpf :FileToRepl<CR>
-autocmd filetype cs nnoremap <silent> cpp :LineToRepl<CR>
-autocmd filetype cs vnoremap <silent> cpp :SelectionToRepl<CR>
+autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
+autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
+autocmd filetype * nnoremap <silent> cpp :LineToRepl<CR>
+autocmd filetype * vnoremap <silent> cpp :SelectionToRepl<CR>
+
+autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'javascript' | let b:csrepl_use_command = g:csrepl_node_command | endif
+autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'cs' | let b:csrepl_use_command = g:csrepl_cs_command | endif
+
+autocmd InsertLeave,BufEnter * syn match csEval		"//= .*$"
+autocmd InsertLeave,BufEnter * syn match csEvalError		"//= (\d,\d): error.*$"
+autocmd InsertLeave,BufEnter * syn match csZshError		"//= zsh:\d: .*$"
+autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
+
+autocmd BufEnter * hi csEval guibg=#343d46 guifg=#99c794
+autocmd BufEnter * hi csEvalError guibg=#343d46 guifg=#ec5f67
+autocmd BufEnter * hi csZshError guibg=#343d46 guifg=#ec5f67
+autocmd BufEnter * hi csBashError guibg=#343d46 guifg=#ec5f67

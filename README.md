@@ -1,14 +1,11 @@
 ## Purpose
 
-To enable repl integration in vim.
+To enable easy repl integration in vim. The inspiration for much of this is LightTables Instarepl and Emacs CIDER inline eval.
 
 ## Requirements
 
-At the moment this plugin requires the Mono C# repl, if at some point there is a better underlying repl available you can change the following.
-
-```viml
-let g:csrepl_use_command = 'somenewrepl'
-```
+At the moment this plugin has support for C# and JavaScript. The underlying C# evalutation is done using the 
+Mono csharp repl. The JavaScript implementation makes use of `node --eval`.
 
 ## Installation
 
