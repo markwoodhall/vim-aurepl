@@ -36,7 +36,10 @@ function! s:SendToRepl(data)
   let clean_data = []
   for d in a:data
     for line in split(d, '\n')
-      let clean = substitute(line, b:csrepl_comment_regex, '', 'g')
+      let clean = line
+      if exists('b:csrepl_comment_regex')
+        let clean = substitute(line, b:csrepl_comment_regex, '', 'g')
+      endif
       let clean_data = clean_data + [clean]
     endfor
   endfor
@@ -51,15 +54,29 @@ function! s:SendToRepl(data)
     if &ft ==# 'clojure'
       let out = fireplace#session_eval(join(clean_data, ''), {"ns": "user"})
     endif
-
     if &ft ==# 'fsharp'
       redir => s:out
-      silent call fsharpbinding#python#FsiEval(join(clean_data, "\n"))
+      if len(clean_data) > 1 && clean_data[1] =~ '\s\s\s\s'
+          call fsharpbinding#python#FsiPurge()
+          call fsharpbinding#python#FsiSend(join(clean_data, "\n"))
+          call fsharpbinding#python#FsiRead(5)
+      else
+        for e in clean_data
+          call fsharpbinding#python#FsiPurge()
+          call fsharpbinding#python#FsiSend(e)
+          call fsharpbinding#python#FsiRead(5)
+        endfor
+      endif
       redir END
       let out = s:out
     endif
-  let out = split(out, '\n')
-  return out
+  endif
+  let out = split(out, "\n")
+  let trimmed = []
+  for o in out
+    let trimmed = trimmed + [substitute(o, '^\s*', '', '')]
+  endfor
+  return trimmed
 endfunction
 
 function! s:NotForOutput(line_number)
@@ -118,18 +135,16 @@ endfunction
 function! s:LineToRepl()
   let line = split(getline('.'), b:csrepl_comment_format)[0]
   let out = s:SendToRepl([line])
-  for m in out
-    if g:csrepl_eval_inline
-      call setline('.', line . b:csrepl_comment_format .' '.m)
-    else
-       echomsg m
-    endif
-  endfor
+  let m = join(out, ' ')
+  if g:csrepl_eval_inline
+    call setline('.', line . b:csrepl_comment_format .' '.m)
+  else
+     echomsg m
+  endif
 endfunction
 
 function! s:FileToRepl()
   let lines = getline(0, '$')
-  call writefile(lines, 'scratch.temp.cs')
   let out = s:SendToRepl(lines)
   let firstline = 0
   let lastline = line('$')
@@ -177,8 +192,8 @@ function! s:Namespaces()
   for n in namespaces
     let lines = lines + ['## '.n]
   endfor
-  let command = expand('%b') =~ '__Namespaces' ? 'e' : 'split'
-  execute command '__Namespaces'
+  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
+  execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
     let b:csrepl_use_command = g:csrepl_cs_command
@@ -195,8 +210,8 @@ function! s:Types(namespace)
   for t in types
     let lines = lines + ['## '.t]
   endfor
-  let command = expand('%b') =~ '__Namespaces' ? 'e' : 'split'
-  execute command '__Namespaces'
+  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
+  execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
     let b:csrepl_use_command = g:csrepl_cs_command
@@ -227,8 +242,8 @@ function! s:Functions(typename)
   for p in properties
     let lines = lines + ['  > '.p]
   endfor
-  let command = expand('%b') =~ '__Namespaces' ? 'e' : 'split'
-  execute command '__Namespaces'
+  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
+  execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
     let b:csrepl_use_command = g:csrepl_cs_command
