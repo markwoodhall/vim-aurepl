@@ -55,20 +55,22 @@ function! s:SendToRepl(data)
       let out = fireplace#session_eval(join(clean_data, ''), {"ns": "user"})
     endif
     if &ft ==# 'fsharp'
+      let g:fsharp_echo_all_fsi_output=1
       redir => s:out
       if len(clean_data) > 1 && clean_data[1] =~ '\s\s\s\s'
-          call fsharpbinding#python#FsiPurge()
-          call fsharpbinding#python#FsiSend(join(clean_data, "\n"))
-          call fsharpbinding#python#FsiRead(5)
+          silent call fsharpbinding#python#FsiPurge()
+          silent call fsharpbinding#python#FsiSend(join(clean_data, "\n"))
+          silent call fsharpbinding#python#FsiRead(5)
       else
         for e in clean_data
-          call fsharpbinding#python#FsiPurge()
-          call fsharpbinding#python#FsiSend(e)
-          call fsharpbinding#python#FsiRead(5)
+          silent call fsharpbinding#python#FsiPurge()
+          silent call fsharpbinding#python#FsiSend(e)
+          silent call fsharpbinding#python#FsiRead(5)
         endfor
       endif
       redir END
       let out = s:out
+      unlet g:fsharp_echo_all_fsi_output
     endif
   endif
   let out = split(out, "\n")
@@ -119,6 +121,9 @@ function! s:SelectionToRepl() range
   let firstline = getpos("'<")[1]
   let lastline = getpos("'>")[1]
   let counter = firstline
+  if len(out) == 1
+    let counter = lastline
+  endif
   for m in out
     if g:csrepl_eval_inline
       while counter < lastline && (substitute(getline(counter), '\w', '', 'g') == '' || !s:NotForOutput(counter))
@@ -280,30 +285,31 @@ autocmd filetype * nnoremap <silent> cpl :LineToRepl<CR>
 autocmd filetype * vnoremap <silent> cps :SelectionToRepl<CR>
 
 autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'javascript' | let b:csrepl_use_command = g:csrepl_node_command | endif
-autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'cs' | let b:csrepl_use_command = g:csrepl_cs_command | endif
+autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'cs'         | let b:csrepl_use_command = g:csrepl_cs_command   | endif
 
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'javascript' | let b:csrepl_comment_format = g:csrepl_comment_format | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'cs' | let b:csrepl_comment_format = g:csrepl_comment_format | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'fsharp' | let b:csrepl_comment_format = g:csrepl_comment_format_fs | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'vim' | let b:csrepl_comment_format = g:csrepl_comment_format_vim | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'clojure' | let b:csrepl_comment_format = g:csrepl_comment_format_clojure | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'javascript' | let b:csrepl_comment_format = g:csrepl_comment_format         | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'cs'         | let b:csrepl_comment_format = g:csrepl_comment_format         | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'fsharp'     | let b:csrepl_comment_format = g:csrepl_comment_format_fs      | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'vim'        | let b:csrepl_comment_format = g:csrepl_comment_format_vim     | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'clojure'    | let b:csrepl_comment_format = g:csrepl_comment_format_clojure | endif
 
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'javascript' | let b:csrepl_comment_regex = g:csrepl_comment_regex | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'cs' | let b:csrepl_comment_regex = g:csrepl_comment_regex | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp' | let b:csrepl_comment_regex = g:csrepl_comment_regex_fs | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim' | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure' | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'javascript' | let b:csrepl_comment_regex = g:csrepl_comment_regex         | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'cs'         | let b:csrepl_comment_regex = g:csrepl_comment_regex         | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp'     | let b:csrepl_comment_regex = g:csrepl_comment_regex_fs      | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim'        | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim     | endif
+autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure'    | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'vim' | syn match csEval	"\"@= .*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'clojure' | syn match csEval	";;= .*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp' | syn match csEval	"//> .*$" | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"@= .*$" | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalError		"//= (\d,\d): error.*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'vim' | syn match csEvalError		"\"@= error.*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'clojure' | syn match csEvalError		";;= error.*$" | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp' | syn match csEvalError		"//> .*: error.*$" | endif
-autocmd InsertLeave,BufEnter * syn match csZshError		"//= zsh:\d: .*$"
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs'         | syn match csEvalError		"//= (\d,\d): error.*$" | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'vim'        | syn match csEvalError		"\"@= error.*$"         | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'    | syn match csEvalError		";;= error.*$"          | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'     | syn match csEvalError		"//> .*: error.*$"      | endif
+autocmd InsertLeave,BufEnter * syn match csZshError		  "//= zsh:\d: .*$"
 autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
 
 autocmd BufEnter * hi csEval guibg=#343d46 guifg=#99c794
