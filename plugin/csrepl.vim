@@ -52,7 +52,11 @@ function! s:SendToRepl(data)
       let out = s:VimEval(clean_data)
     endif
     if &ft ==# 'clojure'
-      let out = fireplace#session_eval(join(clean_data, ''), {"ns": "user"})
+      try
+        let out = fireplace#session_eval(join(clean_data, ''), {"ns": "user"})
+      catch
+        let out = 'error: ' . v:exception
+      endtry
     endif
     if &ft ==# 'fsharp'
       let g:fsharp_echo_all_fsi_output=1
