@@ -316,7 +316,7 @@ autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'     | syn match csEvalError		
 autocmd InsertLeave,BufEnter * syn match csZshError		  "//= zsh:\d: .*$"
 autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
 
-autocmd BufEnter * hi csEval guibg=#343d46 guifg=#99c794
-autocmd BufEnter * hi csEvalError guibg=#343d46 guifg=#ec5f67
-autocmd BufEnter * hi csZshError guibg=#343d46 guifg=#ec5f67
-autocmd BufEnter * hi csBashError guibg=#343d46 guifg=#ec5f67
+autocmd BufEnter * hi csEval guifg=#fff guibg=#03525F
+autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
+autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
+autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
