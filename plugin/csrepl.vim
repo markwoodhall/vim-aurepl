@@ -40,6 +40,13 @@ function! s:SendToRepl(data)
       if exists('b:csrepl_comment_regex')
         let clean = substitute(line, b:csrepl_comment_regex, '', 'g')
       endif
+      if &ft ==# 'cs'
+        if line =~ 'if (.*' && line !~ 'else if (.*'
+          let the_if = substitute(line, 'if (', '', '')
+          let the_if = the_if[0:-2]
+          let clean_data = clean_data + [the_if]
+        endif
+      endif
       let clean_data = clean_data + [clean]
     endfor
   endfor
@@ -303,13 +310,17 @@ autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp'     
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim'        | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim     | endif
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure'    | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalCondition	"//= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn region  csEvalRegion		start="; " end="$" contains=CsEval | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  contained| endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"@= .*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs'         | syn match csEvalError		"//= (\d,\d): error.*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
+
+
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'        | syn match csEvalError		"\"@= error.*$"         | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'    | syn match csEvalError		";;= error.*$"          | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'     | syn match csEvalError		"//> .*: error.*$"      | endif
@@ -317,6 +328,7 @@ autocmd InsertLeave,BufEnter * syn match csZshError		  "//= zsh:\d: .*$"
 autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
 
 autocmd BufEnter * hi csEval guifg=#fff guibg=#03525F
+autocmd BufEnter * hi csEvalCondition guifg=#fff guibg=#5D0089
 autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
