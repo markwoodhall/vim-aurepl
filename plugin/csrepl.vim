@@ -15,8 +15,14 @@ let g:csrepl_comment_regex_fs = '\s\/\/>\s.*'
 let g:csrepl_comment_regex_vim = '\s"@=\s.*'
 let g:csrepl_comment_regex_clojure = '\s;;=\s.*'
 
+let s:range_added = []
+
 if !exists('g:csrepl_eval_inline')
   let g:csrepl_eval_inline = 1
+endif
+
+if !exists('g:csrepl_eval_inline_position')
+  let g:csrepl_eval_inline_position = 'inline'
 endif
 
 function! s:VimEval(data)
@@ -40,13 +46,6 @@ function! s:SendToRepl(data)
       if exists('b:csrepl_comment_regex')
         let clean = substitute(line, b:csrepl_comment_regex, '', 'g')
       endif
-      if &ft ==# 'cs'
-        if line =~ 'if (.*' && line !~ 'else if (.*'
-          let the_if = substitute(line, 'if (', '', '')
-          let the_if = the_if[0:-2]
-          let clean_data = clean_data + [the_if]
-        endif
-      endif
       let clean_data = clean_data + [clean]
     endfor
   endfor
@@ -67,20 +66,28 @@ function! s:SendToRepl(data)
     endif
     if &ft ==# 'fsharp'
       let g:fsharp_echo_all_fsi_output=1
-      redir => s:out
-      if len(clean_data) > 1 && clean_data[1] =~ '\s\s\s\s'
+      let out_array = []
+      let expressions = []
+      for d in clean_data
+        if d =~ '^\w'
+          let expressions = expressions + [[d]]
+        else
+          let last_expression = expressions[-1]
+          let last_expression = last_expression + [d]
+          let expressions[-1] = last_expression
+        endif
+      endfor
+      echomsg string(expressions)
+      for e in expressions
+        redir => s:out
           silent call fsharpbinding#python#FsiPurge()
-          silent call fsharpbinding#python#FsiSend(join(clean_data, "\n"))
+          silent call fsharpbinding#python#FsiSend(join(e, "\n"))
           silent call fsharpbinding#python#FsiRead(5)
-      else
-        for e in clean_data
-          silent call fsharpbinding#python#FsiPurge()
-          silent call fsharpbinding#python#FsiSend(e)
-          silent call fsharpbinding#python#FsiRead(5)
-        endfor
-      endif
-      redir END
-      let out = s:out
+        redir END
+        let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
+        let s:out = ''
+        let out = join(out_array, "\n")
+      endfor
       unlet g:fsharp_echo_all_fsi_output
     endif
   endif
@@ -90,33 +97,6 @@ function! s:SendToRepl(data)
     let trimmed = trimmed + [substitute(o, '^\s*', '', '')]
   endfor
   return trimmed
-endfunction
-
-function! s:NotForOutput(line_number)
-  let line = split(getline(a:line_number), b:csrepl_comment_format)
-  let prev_line = split(getline(a:line_number-1), b:csrepl_comment_format)
-  let next_line =  split(getline(a:line_number+1), b:csrepl_comment_format)
-
-  let line = len(line) == 0 ? '' : line[0]
-  let prev_line = len(prev_line) == 0 ? '' : prev_line[0]
-  let next_line = len(next_line) == 0 ? '' : next_line[0]
-
-  let result = line !~ 'var\s.*$'
-  let result = result && line !~ '\w.\s=\s.*$'
-  let result = result && (line !~ 'foreach.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
-  let result = result && (line !~ 'while.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
-  let result = result && (line !~ 'switch.*(.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
-  let result = result && (line !~ 'do.*$' || (line =~ 'do.*$' && next_line !~ '{.*'))
-  let result = result && line !~ 'for.*(.*$'
-  let result = result && line !~ 'public.*$'
-  let result = result && line !~ 'private.*$'
-  let result = result && line !~ 'using.*$'
-  let result = result && line !~ 'Func<.*$'
-  let result = result && line !~ '{.*$'
-  let result = result && line !~ '}.*$'
-  let result = result && line !~ '^\..*$'
-  let result = result && prev_line !~ '{.*$' && next_line !~ '}.*'
-  return result
 endfunction
 
 function! s:SelectionToRepl() range
@@ -129,23 +109,44 @@ function! s:SelectionToRepl() range
   call setreg('"', old_reg, old_regtype)
   let &clipboard = old_clipboard
   let out = s:SendToRepl([selection])
-  let firstline = getpos("'<")[1]
   let lastline = getpos("'>")[1]
-  let counter = firstline
-  if len(out) == 1
-    let counter = lastline
-  endif
+  let commented = []
   for m in out
-    if g:csrepl_eval_inline
-      while counter < lastline && (substitute(getline(counter), '\w', '', 'g') == '' || !s:NotForOutput(counter))
-        let counter = counter + 1
-      endwhile
-      call setline(counter, split(getline(counter), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
-    else
-      echomsg m
-    endif
-    let counter = (counter < lastline) ? counter + 1 : counter
+    let commented = commented + [b:csrepl_comment_format .' '.m]
   endfor
+  if g:csrepl_eval_inline
+    if g:csrepl_eval_inline_position == 'bottom'
+      if len(commented) > 0
+        let s:range_added = s:range_added + [[lastline+1, lastline+len(out)]]
+        call append(lastline, commented)
+      endif
+    elseif g:csrepl_eval_inline_position == 'right'
+      let m = join(out, ' ')
+      call setline(lastline, getline(lastline) . b:csrepl_comment_format .' '.m)
+    elseif g:csrepl_eval_inline_position == 'inline'
+      let firstline = getpos("'<")[1]
+      let counter = lastline
+      for m in reverse(out)
+        while counter > firstline && (substitute(getline(counter), '\s', '', 'g') == '')
+          let counter = counter - 1
+        endwhile
+        call setline(counter, split(getline(counter), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
+        let counter = (counter > firstline) ? counter - 1 : counter
+      endfor
+    endif
+  else
+    echomsg m
+  endif
+endfunction
+
+function! s:CleanUp()
+  if g:csrepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
+    for r in reverse(s:range_added)
+      let [fromline, toline] = r
+      execute fromline . "," . toline . "delete" 
+    endfor
+    let s:range_added = []
+  endif
 endfunction
 
 function! s:LineToRepl()
@@ -164,18 +165,31 @@ function! s:FileToRepl()
   let out = s:SendToRepl(lines)
   let firstline = 0
   let lastline = line('$')
-  let counter = firstline
+  let commented = []
   for m in out
-    if g:csrepl_eval_inline
-      while counter < lastline && (substitute(getline(counter), '\w', '', 'g') == '' || !s:NotForOutput(counter))
-        let counter = counter + 1
-      endwhile
-      call setline(counter, split(getline(counter), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
-    else
-       echomsg m
-    endif
-    let counter = (counter < lastline) ? counter + 1 : counter
+    let commented = commented + [b:csrepl_comment_format .' '.m]
   endfor
+  if g:csrepl_eval_inline
+    if g:csrepl_eval_inline_position == 'bottom'
+      if len(commented) > 0
+        let s:range_added = s:range_added + [[lastline+1, lastline+len(out)]]
+        call append(lastline, commented)
+      endif
+    elseif g:csrepl_eval_inline_position == 'right'
+      let m = join(out, ' ')
+      call setline(lastline, getline(lastline) . b:csrepl_comment_format .' '.m)
+    elseif g:csrepl_eval_inline_position == 'inline'
+      let firstline = getpos("'<")[1]
+      let counter = lastline
+      for m in reverse(out)
+        while counter > firstline && (substitute(getline(counter), '\s', '', 'g') == '')
+          let counter = counter - 1
+        endwhile
+        call setline(counter, split(getline(counter), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
+        let counter = (counter > firstline) ? counter - 1 : counter
+      endfor
+    endif
+  endif
 endfunction
 
 function! s:Repl(repl_type)
@@ -278,6 +292,9 @@ autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
 
+autocmd BufWritePre * silent call s:CleanUp()
+autocmd BufLeave * silent call s:CleanUp()
+
 autocmd BufWritePre *.cs,*.js silent! %s/\s\/\/=\s.*//g
 autocmd BufLeave *.cs,*.js silent! %s/\s\/\/=\s.*//g
 
@@ -286,9 +303,6 @@ autocmd BufLeave *.fs,*.fsx silent! %s/\s\/\/>\s.*//g
 
 autocmd BufWritePre *.vim silent! %s/\s"@=\s.*//g
 autocmd BufLeave *.vim silent! %s/\s"@=\s.*//g
-
-autocmd BufWritePre *.clj,*.cljs,*.cljc silent! %s/\s;;=\s.*//g
-autocmd BufLeave *.clj,*.cljs,*.cljc silent! %s/\s;;=\s.*//g
 
 autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
@@ -310,9 +324,7 @@ autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp'     
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim'        | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim     | endif
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure'    | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalCondition	"//= .*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn region  csEvalRegion		start="; " end="$" contains=CsEval | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  contained| endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"@= .*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
@@ -328,7 +340,6 @@ autocmd InsertLeave,BufEnter * syn match csZshError		  "//= zsh:\d: .*$"
 autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
 
 autocmd BufEnter * hi csEval guifg=#fff guibg=#03525F
-autocmd BufEnter * hi csEvalCondition guifg=#fff guibg=#5D0089
 autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
