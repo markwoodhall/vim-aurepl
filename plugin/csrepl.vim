@@ -25,6 +25,10 @@ if !exists('g:csrepl_eval_inline_position')
   let g:csrepl_eval_inline_position = 'inline'
 endif
 
+if !exists('g:csrepl_eval_inline_cs_experimental')
+  let g:csrepl_eval_inline_cs_experimental = 1
+endif
+
 function! s:VimEval(data)
   let out = ''
   for d in a:data
@@ -52,7 +56,7 @@ function! s:SendToRepl(line_offset, data)
       if matchstr(line, '^\s*$')
         let counter += 1
       endif
-      if &ft ==# 'cs' && g:csrepl_eval_inline_position == 'inline'
+      if &ft ==# 'cs' && g:csrepl_eval_inline_position == 'inline' && g:csrepl_eval_inline_cs_experimental == 1
        if line =~ '^\s*\w*\s*\w*\s*=\s*'
          let the_var = substitute(line, '^\s*\w*\s*\w*\s*=\s*', '', '')
          let the_var = the_var[0:-2]
@@ -96,7 +100,7 @@ function! s:SendToRepl(line_offset, data)
   if exists('b:csrepl_use_command') && executable(split(b:csrepl_use_command, ' ')[0])
     call writefile(clean_data, 'scratch.temp.'.expand('%:e'))
     let out = system(b:csrepl_use_command)
-   " call delete('scratch.temp.'.expand('%:e'))
+    call delete('scratch.temp.'.expand('%:e'))
   else
     if &ft ==# 'vim'
       let out = s:VimEval(clean_data)
@@ -181,7 +185,7 @@ function! s:SelectionToRepl() range
 endfunction
 
 function! s:FileToRepl()
-  call s:LinesToRepl(0, line('$'))
+  call s:LinesToRepl(1, line('$'))
 endfunction
 
 function! s:LineToRepl()
@@ -190,11 +194,11 @@ endfunction
 
 function! s:LinesToRepl(start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
-  let offset = a:start_line
-  if offset > 0
-    let offset -= 1 
+  let start_offset = a:start_line
+  if &ft ==# 'cs' && g:csrepl_eval_inline_cs_experimental == 1
+    let start_offset -= 1
   endif
-  let out = s:SendToRepl(offset, lines)
+  let out = s:SendToRepl(start_offset, lines)
   let commented = []
   for m in out
     let commented = commented + [b:csrepl_comment_format .' '.m]
@@ -215,7 +219,7 @@ function! s:LinesToRepl(start_line, end_line)
       let m = join(outputs, b:csrepl_comment_format . ' ')
       call setline(a:end_line, split(getline(a:end_line), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
     elseif g:csrepl_eval_inline_position == 'inline'
-      if &ft ==# 'cs'
+      if &ft ==# 'cs' && g:csrepl_eval_inline_cs_experimental == 1
         let outputs = []
         let conditions = []
         for m in out
@@ -238,7 +242,10 @@ function! s:LinesToRepl(start_line, end_line)
           while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || (&ft ==# 'clojure' && (matchstr(getline(counter), ')\s*$') == '' || substitute(getline(counter+1), '\s', '', 'g') != '')))
             let counter = counter - 1
           endwhile
-          call setline(counter, split(getline(counter), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
+          let parts = split(getline(counter), b:csrepl_comment_format)
+          if len(parts) > 0
+            call setline(counter, parts[0] . b:csrepl_comment_format .' '.m)
+          endif
           let counter = (counter > a:start_line) ? counter - 1 : counter
         endfor
       endif
