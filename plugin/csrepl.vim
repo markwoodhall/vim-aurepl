@@ -10,10 +10,12 @@ let g:csrepl_comment_format = ' //='
 let g:csrepl_comment_format_fs = ' //>'
 let g:csrepl_comment_format_vim = ' "@='
 let g:csrepl_comment_format_clojure = ' ;;='
-let g:csrepl_comment_regex = '\s\/\/=\s.*'
-let g:csrepl_comment_regex_fs = '\s\/\/>\s.*'
+let g:csrepl_comment_regex = '\s*\/\/=\s.*\|\/\/=\s.*'
+let g:csrepl_comment_regex_fs = '\s*\/\/>\s.*\|\/\/>\s.*'
 let g:csrepl_comment_regex_vim = '\s"@=\s.*'
-let g:csrepl_comment_regex_clojure = '\s;;=\s.*'
+let g:csrepl_comment_regex_clojure = '\s*;;=\s.*\|;;=\s.*'
+let g:csrepl_expression_start_fs = '^\w\|^\['
+let g:csrepl_expression_start_clojure = '^(\|^\['
 
 let s:range_added = []
 
@@ -110,7 +112,7 @@ function! s:SendToRepl(line_offset, data)
         let expressions = []
         let out_array = []
         for d in clean_data
-          if d =~ '^('
+          if d =~ b:csrepl_expression_start
             let expressions = expressions + [[d]]
           else
             let last_expression = expressions[-1]
@@ -131,7 +133,7 @@ function! s:SendToRepl(line_offset, data)
       let out_array = []
       let expressions = []
       for d in clean_data
-        if d =~ '^\w'
+        if d =~ b:csrepl_expression_start
           let expressions = expressions + [[d]]
         else
           let last_expression = expressions[-1]
@@ -140,14 +142,18 @@ function! s:SendToRepl(line_offset, data)
         endif
       endfor
       for e in expressions
-        redir => s:out
-          silent call fsharpbinding#python#FsiPurge()
-          silent call fsharpbinding#python#FsiSend(join(e, "\n"))
-          silent call fsharpbinding#python#FsiRead(5)
-        redir END
-        let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
-        let s:out = ''
-        let out = join(out_array, "\n")
+        try
+          redir => s:out
+            silent call fsharpbinding#python#FsiPurge()
+            silent call fsharpbinding#python#FsiSend(join(e, "\n"))
+            silent call fsharpbinding#python#FsiRead(5)
+          redir END
+          let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
+        catch
+          let out_array = out_array + [v:exception]
+        endtry
+          let s:out = ''
+          let out = join(out_array, "\n")
       endfor
       unlet g:fsharp_echo_all_fsi_output
     endif
@@ -167,6 +173,18 @@ function! s:CleanUp()
       execute fromline . "," . toline . "delete" 
     endfor
     let s:range_added = []
+  endif
+endfunction
+
+function! s:CleanLine()
+  let current_line = line('.')
+  let comment = matchstr(getline(current_line), b:csrepl_comment_regex)
+  let cleaned_line = substitute(getline(current_line), b:csrepl_comment_regex, 'CSREPL_PLACEHOLDER', '')
+  let cleaned_line = substitute(cleaned_line, '\s', '', 'g')
+  if cleaned_line == 'CSREPL_PLACEHOLDER'
+    let cleaned_line = substitute(cleaned_line, 'CSREPL_PLACEHOLDER', '', 'g')
+    call setline(current_line, cleaned_line)
+    call setline(current_line-1, getline(current_line-1) . ' ' . comment)
   endif
 endfunction
 
@@ -190,6 +208,24 @@ endfunction
 
 function! s:LineToRepl()
   call s:LinesToRepl(line('.'), line('.'))
+endfunction
+
+function! s:ExpressionToRepl()
+  let start_line = 1
+  let end_line = line('.')
+  let counter = end_line
+  if matchstr(getline(end_line), b:csrepl_expression_start) != ''
+    call s:LinesToRepl(end_line, line('.'))
+    return
+  endif
+  while counter > start_line && matchstr(getline(counter), b:csrepl_expression_start) == ''
+    let counter -= 1
+  endwhile
+  call s:LinesToRepl(counter, line('.'))
+endfunction
+
+function! s:SupressLineOutput(line_number)
+  return ((substitute(getline(a:line_number), '\s', '', 'g') != '') && &ft ==# 'clojure' && (matchstr(split(getline(a:line_number), b:csrepl_comment_format)[0], ')\s*$') == '' || substitute(split(getline(a:line_number+1), b:csrepl_comment_format)[0], '\s', '', 'g') != ''))
 endfunction
 
 function! s:LinesToRepl(start_line, end_line)
@@ -239,7 +275,7 @@ function! s:LinesToRepl(start_line, end_line)
       else
         let counter = a:end_line
         for m in reverse(out)
-          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || (&ft ==# 'clojure' && (matchstr(getline(counter), ')\s*$') == '' || substitute(getline(counter+1), '\s', '', 'g') != '')))
+          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:SupressLineOutput(counter))
             let counter = counter - 1
           endwhile
           let parts = split(getline(counter), b:csrepl_comment_format)
@@ -352,6 +388,15 @@ autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
 
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine() | endif
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
+
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine() | endif
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'fsharp' && ((len(split(getline('.'), '"')) - 1) % 2) == 0 | silent! call s:ExpressionToRepl() | endif
+
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine() | endif
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
+
 autocmd BufWritePre * silent call s:CleanUp()
 autocmd BufLeave * silent call s:CleanUp()
 
@@ -386,6 +431,9 @@ autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'cs'         
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp'     | let b:csrepl_comment_regex = g:csrepl_comment_regex_fs      | endif
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim'        | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim     | endif
 autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure'    | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
+
+autocmd BufEnter * if !exists('b:csrepl_expression_start') && &ft ==# 'fsharp'     | let b:csrepl_expression_start = g:csrepl_expression_start_fs      | endif
+autocmd BufEnter * if !exists('b:csrepl_expression_start') && &ft ==# 'clojure'    | let b:csrepl_expression_start = g:csrepl_expression_start_clojure | endif
 
 autocmd BufEnter * if &ft ==# 'cs'         | let g:csrepl_eval_inline_position = 'inline' | endif
 autocmd BufEnter * if &ft ==# 'javascript' | let g:csrepl_eval_inline_position = 'lastline' | endif
