@@ -263,11 +263,11 @@ function! s:SupressLineOutput(line_number)
 endfunction
 
 function! s:SupressEval(line_number)
-  if substitute(getline(a:line_number), '\s', '', 'g') == ''
-    return 1
-  endif
-  let parts = split(getline(a:line_number), b:aurepl_comment_format)
   if &ft ==# 'fsharp'
+    if substitute(getline(a:line_number), '\s', '', 'g') == ''
+      return 1
+    endif
+    let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let hanging_equals = 0
     let in_quotes = 0
     if len(parts) > 0
