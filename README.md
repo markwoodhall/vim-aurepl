@@ -13,7 +13,7 @@ Install using your favourite plugin manager,
 I use [vim-plug](https://github.com/junegunn/vim-plug)
 
 ```viml
-Plug 'markwoodhall/vim-csrepl'
+Plug 'markwoodhall/vim-aurepl'
 ```
 
 ## Configuration
@@ -21,7 +21,7 @@ Plug 'markwoodhall/vim-csrepl'
 When you send something to the repl the output of the command will appear inline, you can disable this with the following.
 
 ```viml
-let g:csrepl_eval_inline = 0
+let g:aurepl_eval_inline = 0
 ```
 
 ## Commands
