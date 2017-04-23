@@ -263,11 +263,11 @@ function! s:SupressLineOutput(line_number)
 endfunction
 
 function! s:SupressEval(line_number)
+  if substitute(getline(a:line_number), '\s', '', 'g') == ''
+    return 1
+  endif
+  let parts = split(getline(a:line_number), b:aurepl_comment_format)
   if &ft ==# 'fsharp'
-    if substitute(getline(a:line_number), '\s', '', 'g') == ''
-      return 1
-    endif
-    let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let hanging_equals = 0
     let in_quotes = 0
     if len(parts) > 0
@@ -443,7 +443,7 @@ autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor
 if g:aurepl_eval_on_type == 1
   autocmd InsertEnter * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' && !s:SupressEval(line('.')) | silent! call s:ExpressionToRepl() | endif
 
   autocmd InsertEnter * if &ft ==# 'fsharp' | call s:CleanLine(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine(1) | endif
