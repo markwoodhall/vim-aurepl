@@ -1,39 +1,39 @@
-if exists('g:loaded_csrepl') || &cp
+if exists('g:loaded_aurepl') || &cp
   finish
 endif
 
-let g:loaded_csrepl = 1
+let g:loaded_aurepl = 1
 
-let g:csrepl_node_command = 'node --eval "$(cat ./scratch.temp.js)" --print'
-let g:csrepl_cs_command = 'csharp ./scratch.temp.cs -warn:0'
+let g:aurepl_node_command = 'node --eval "$(cat ./scratch.temp.js)" --print'
+let g:aurepl_cs_command = 'csharp ./scratch.temp.cs -warn:0'
 
-let g:csrepl_comment_format = '//='
-let g:csrepl_comment_format_fs = '//>'
-let g:csrepl_comment_format_vim = '"@='
-let g:csrepl_comment_format_clojure = ';;='
-let g:csrepl_comment_regex = '\/\/=\s.*'
-let g:csrepl_comment_regex_fs = '\/\/>\s.*'
-let g:csrepl_comment_regex_vim = '"@=\s.*'
-let g:csrepl_comment_regex_clojure = ';;=\s.*'
-let g:csrepl_expression_start_fs = '^\w\|^\['
-let g:csrepl_expression_start_clojure = '^(\|^\['
+let g:aurepl_comment_format = '//='
+let g:aurepl_comment_format_fs = '//>'
+let g:aurepl_comment_format_vim = '"@='
+let g:aurepl_comment_format_clojure = ';;='
+let g:aurepl_comment_regex = '\/\/=\s.*'
+let g:aurepl_comment_regex_fs = '\/\/>\s.*'
+let g:aurepl_comment_regex_vim = '"@=\s.*'
+let g:aurepl_comment_regex_clojure = ';;=\s.*'
+let g:aurepl_expression_start_fs = '^\w\|^\['
+let g:aurepl_expression_start_clojure = '^(\|^\['
 
 let s:range_added = []
 
-if !exists('g:csrepl_eval_inline')
-  let g:csrepl_eval_inline = 1
+if !exists('g:aurepl_eval_inline')
+  let g:aurepl_eval_inline = 1
 endif
 
-if !exists('g:csrepl_eval_inline_position')
-  let g:csrepl_eval_inline_position = 'inline'
+if !exists('g:aurepl_eval_inline_position')
+  let g:aurepl_eval_inline_position = 'inline'
 endif
 
-if !exists('g:csrepl_eval_inline_cs_experimental')
-  let g:csrepl_eval_inline_cs_experimental = 1
+if !exists('g:aurepl_eval_inline_cs_experimental')
+  let g:aurepl_eval_inline_cs_experimental = 1
 endif
 
-if !exists('g:csrepl_eval_on_type')
-  let g:csrepl_eval_on_type = 1
+if !exists('g:aurepl_eval_on_type')
+  let g:aurepl_eval_on_type = 1
 endif
 
 function! s:VimEval(data)
@@ -53,25 +53,25 @@ function! s:SendToRepl(line_offset, data)
   let counter = 1 + a:line_offset
   let clean_data = []
   if &ft ==# 'cs'
-    let clean_data = ['LoadAssembly("System.Web.Extensions");', 'using System.Web.Script.Serialization;', 'var csrepl_json_serializer = new JavaScriptSerializer();']
+    let clean_data = ['LoadAssembly("System.Web.Extensions");', 'using System.Web.Script.Serialization;', 'var aurepl_json_serializer = new JavaScriptSerializer();']
   endif
   for d in a:data
     for line in split(d, '\n')
-      if exists('b:csrepl_comment_regex')
-        let line = substitute(line, b:csrepl_comment_regex, '', 'g')
+      if exists('b:aurepl_comment_regex')
+        let line = substitute(line, b:aurepl_comment_regex, '', 'g')
       endif
       if matchstr(line, '^\s*$')
         let counter += 1
       endif
-      if &ft ==# 'cs' && g:csrepl_eval_inline_position == 'inline' && g:csrepl_eval_inline_cs_experimental == 1
+      if &ft ==# 'cs' && g:aurepl_eval_inline_position == 'inline' && g:aurepl_eval_inline_cs_experimental == 1
        if line =~ '^\s*\w*\s*\w*\s*=\s*'
          let the_var = substitute(line, '^\s*\w*\s*\w*\s*=\s*', '', '')
          let the_var = the_var[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", csrepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
+         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
        elseif line =~ '^\s*var\s*\w*\s*=\s*'
          let the_var = substitute(line, '^\s*var\s*\w*\s*=\s*', '', '')
          let the_var = the_var[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", csrepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
+         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
        elseif line =~ 'if (.*' && line !~ 'else if (.*'
          let the_if = substitute(line, 'if (', '', '')
          let the_if = the_if[0:-2]
@@ -85,16 +85,16 @@ function! s:SendToRepl(line_offset, data)
          let the_evaluation = substitute(the_evaluation, '\s\+$', '', '')
          let the_evaluation = the_evaluation[0:-3]
          if the_evaluation =~ '{0}'
-           let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", csrepl_json_serializer.Serialize(string.Format(' . the_evaluation . ')), '. counter . ');']
+           let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(string.Format(' . the_evaluation . ')), '. counter . ');']
          else
            let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", ' . (the_evaluation) . '.ToString(), '. counter . ');']
          endif
        elseif line =~ '^\w*.;$'
          let the_evaluation = line[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", csrepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
+         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", aurepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
        elseif line =~ '^\s*\w*\.\w*.*;' || line =~ '^s*\w*(.*;'
          let the_evaluation = line[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", csrepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
+         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", aurepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
        endif
      endif
      let clean_data = clean_data + [line]
@@ -104,9 +104,9 @@ function! s:SendToRepl(line_offset, data)
     endfor
     let counter += 1
   endfor
-  if exists('b:csrepl_use_command') && executable(split(b:csrepl_use_command, ' ')[0])
+  if exists('b:aurepl_use_command') && executable(split(b:aurepl_use_command, ' ')[0])
     call writefile(clean_data, 'scratch.temp.'.expand('%:e'))
-    let out = system(b:csrepl_use_command)
+    let out = system(b:aurepl_use_command)
     call delete('scratch.temp.'.expand('%:e'))
   else
     if &ft ==# 'vim'
@@ -117,7 +117,7 @@ function! s:SendToRepl(line_offset, data)
         let expressions = []
         let out_array = []
         for d in clean_data
-          if d =~ b:csrepl_expression_start
+          if d =~ b:aurepl_expression_start
             let expressions = expressions + [[d]]
           else
             let last_expression = expressions[-1]
@@ -138,7 +138,7 @@ function! s:SendToRepl(line_offset, data)
       let out_array = []
       let expressions = []
       for d in clean_data
-        if d =~ b:csrepl_expression_start
+        if d =~ b:aurepl_expression_start
           let expressions = expressions + [[d]]
         else
           let last_expression = expressions[-1]
@@ -172,7 +172,7 @@ function! s:SendToRepl(line_offset, data)
 endfunction
 
 function! s:CleanUp()
-  if g:csrepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
+  if g:aurepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
     for r in reverse(s:range_added)
       let [fromline, toline] = r
       execute fromline . "," . toline . "delete" 
@@ -183,8 +183,8 @@ endfunction
 
 function! s:CleanLine(shuffle)
   let current_line = line('.')
-  let comment = matchstr(getline(current_line), b:csrepl_comment_regex)
-  let cleaned_line = substitute(getline(current_line), b:csrepl_comment_regex, 'CSREPL_PLACEHOLDER', '')
+  let comment = matchstr(getline(current_line), b:aurepl_comment_regex)
+  let cleaned_line = substitute(getline(current_line), b:aurepl_comment_regex, 'CSREPL_PLACEHOLDER', '')
   let shuffle = a:shuffle
   if cleaned_line =~ 'CSREPL_PLACEHOLDER'
     let cleaned_line = substitute(cleaned_line, 'CSREPL_PLACEHOLDER', '', 'g')
@@ -223,11 +223,11 @@ function! s:ExpressionToRepl()
   let start_line = 1
   let end_line = line('.')
   let counter = end_line
-  if matchstr(getline(end_line), b:csrepl_expression_start) != ''
+  if matchstr(getline(end_line), b:aurepl_expression_start) != ''
     call s:LinesToRepl(end_line, line('.'))
     return
   endif
-  while counter > start_line && matchstr(getline(counter), b:csrepl_expression_start) == ''
+  while counter > start_line && matchstr(getline(counter), b:aurepl_expression_start) == ''
     let counter -= 1
   endwhile
   call s:LinesToRepl(counter, line('.'))
@@ -236,13 +236,13 @@ endfunction
 function! s:SupressLineOutput(line_number)
   if &ft ==# 'clojure'
     let non_empty_line = (substitute(getline(a:line_number), '\s', '', 'g') != '')
-    let parts = split(getline(a:line_number), b:csrepl_comment_format)
+    let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let end_of_expression = 0
     if len(parts) > 0
       let end_of_expression = (matchstr(parts[0], ')$\|)\s*$') != '')
     endif
 
-    let next_parts = split(getline(a:line_number+1), b:csrepl_comment_format)
+    let next_parts = split(getline(a:line_number+1), b:aurepl_comment_format)
     let next_line_empty = 1
     if len(next_parts) > 0
       let next_line_empty = substitute(next_parts[0], '\s', '', 'g') == ''
@@ -250,7 +250,7 @@ function! s:SupressLineOutput(line_number)
 
     return (non_empty_line && (!end_of_expression || !next_line_empty))
   elseif &ft ==# 'fsharp'
-    let parts = split(getline(a:line_number), b:csrepl_comment_format)
+    let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let trailing_equals = 0
     if len(parts) > 0
       let trailing_equals = matchstr(parts[0], '=$\|=\s*$') != ''
@@ -267,7 +267,7 @@ function! s:SupressEval(line_number)
     if substitute(getline(a:line_number), '\s', '', 'g') == ''
       return 1
     endif
-    let parts = split(getline(a:line_number), b:csrepl_comment_format)
+    let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let hanging_equals = 0
     let in_quotes = 0
     if len(parts) > 0
@@ -283,31 +283,31 @@ endfunction
 function! s:LinesToRepl(start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
   let start_offset = a:start_line
-  if &ft ==# 'cs' && g:csrepl_eval_inline_cs_experimental == 1
+  if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
     let start_offset -= 1
   endif
   let out = s:SendToRepl(start_offset, lines)
   let commented = []
   for m in out
-    let commented = commented + [b:csrepl_comment_format .' '.m]
+    let commented = commented + [b:aurepl_comment_format .' '.m]
   endfor
-  if g:csrepl_eval_inline
-    if g:csrepl_eval_inline_position == 'bottom'
+  if g:aurepl_eval_inline
+    if g:aurepl_eval_inline_position == 'bottom'
       if len(commented) > 0
         let s:range_added = s:range_added + [[a:end_line+1, a:end_line+len(out)]]
         call append(a:end_line, commented)
       endif
-    elseif g:csrepl_eval_inline_position == 'lastline'
+    elseif g:aurepl_eval_inline_position == 'lastline'
       let outputs = []
       for m in out
         if m !~ ':\d*:'
           let outputs = outputs + [m]
         endif
       endfor
-      let m = join(outputs, b:csrepl_comment_format . ' ')
-      call setline(a:end_line, split(getline(a:end_line), b:csrepl_comment_format)[0] . b:csrepl_comment_format .' '.m)
-    elseif g:csrepl_eval_inline_position == 'inline'
-      if &ft ==# 'cs' && g:csrepl_eval_inline_cs_experimental == 1
+      let m = join(outputs, b:aurepl_comment_format . ' ')
+      call setline(a:end_line, split(getline(a:end_line), b:aurepl_comment_format)[0] . b:aurepl_comment_format .' '.m)
+    elseif g:aurepl_eval_inline_position == 'inline'
+      if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
         let outputs = []
         let conditions = []
         for m in out
@@ -319,9 +319,9 @@ function! s:LinesToRepl(start_line, end_line)
         endfor
         for c in conditions
           let linenumber = matchstr(c, ':\d*:')[1:-2]
-          let parts = split(getline(linenumber), b:csrepl_comment_format)
+          let parts = split(getline(linenumber), b:aurepl_comment_format)
           if len(parts) > 0
-            call setline(linenumber, parts[0] . b:csrepl_comment_format .' '.substitute(substitute(c, ':\d*:', '', ''), '^\s*', '', ''))
+            call setline(linenumber, parts[0] . b:aurepl_comment_format .' '.substitute(substitute(c, ':\d*:', '', ''), '^\s*', '', ''))
           endif
         endfor
       else
@@ -330,16 +330,16 @@ function! s:LinesToRepl(start_line, end_line)
           while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:SupressLineOutput(counter))
             let counter = counter - 1
           endwhile
-          let parts = split(getline(counter), b:csrepl_comment_format)
+          let parts = split(getline(counter), b:aurepl_comment_format)
           if len(parts) > 0
-            call setline(counter, parts[0] . b:csrepl_comment_format .' '.m)
+            call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
           endif
           let counter = (counter > a:start_line) ? counter - 1 : counter
         endfor
       endif
     endif
   else
-    let m = join(outputs, b:csrepl_comment_format . ' ')
+    let m = join(outputs, b:aurepl_comment_format . ' ')
     echomsg m
   endif
 endfunction
@@ -371,7 +371,7 @@ function! s:Namespaces()
   execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
-    let b:csrepl_use_command = g:csrepl_cs_command
+    let b:aurepl_use_command = g:aurepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
@@ -389,7 +389,7 @@ function! s:Types(namespace)
   execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
-    let b:csrepl_use_command = g:csrepl_cs_command
+    let b:aurepl_use_command = g:aurepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
@@ -421,7 +421,7 @@ function! s:Functions(typename)
   execute command '__Namespaces.cs'
     setlocal filetype=markdown
     setlocal buftype=nofile
-    let b:csrepl_use_command = g:csrepl_cs_command
+    let b:aurepl_use_command = g:aurepl_cs_command
   call append(0, lines)
   normal! gg
   nnoremap <buffer> <ESC> :q<CR>
@@ -433,14 +433,14 @@ autocmd filetype * command! -buffer FsRepl :exe s:Repl('fsx')
 autocmd filetype * command! -buffer JsRepl :exe s:Repl('js')
 autocmd filetype * command! -buffer FileToRepl :call s:FileToRepl()
 autocmd filetype * command! -buffer LineToRepl :call s:LineToRepl()
-autocmd filetype * command! -buffer ExpressionToRepl :call s:ExpressionToRepl()
+autocmd filetype clojure,fsharp command! -buffer ExpressionToRepl :call s:ExpressionToRepl()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
 autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
 
-if g:csrepl_eval_on_type == 1
+if g:aurepl_eval_on_type == 1
   autocmd InsertEnter * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
@@ -454,10 +454,10 @@ if g:csrepl_eval_on_type == 1
 endif
 
 autocmd BufWritePre,BufLeave * silent call s:CleanUp()
-autocmd BufWritePre,BufLeave *.cs,*.js execute "silent! %s/".g:csrepl_comment_regex."//g"
-autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:csrepl_comment_regex_fs."//g"
-autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:csrepl_comment_regex_vim."//g"
-autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:csrepl_comment_regex_clojure."//g"
+autocmd BufWritePre,BufLeave *.cs,*.js execute "silent! %s/".g:aurepl_comment_regex."//g"
+autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:aurepl_comment_regex_fs."//g"
+autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:aurepl_comment_regex_vim."//g"
+autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:aurepl_comment_regex_clojure."//g"
 
 autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
@@ -465,26 +465,26 @@ autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
 autocmd filetype * nnoremap <silent> cpl :LineToRepl<CR>
 autocmd filetype * vnoremap <silent> cps :SelectionToRepl<CR>
 
-autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'javascript' | let b:csrepl_use_command = g:csrepl_node_command | endif
-autocmd BufEnter * if !exists('b:csrepl_use_command') && &ft ==# 'cs'         | let b:csrepl_use_command = g:csrepl_cs_command   | endif
+autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'javascript' | let b:aurepl_use_command = g:aurepl_node_command | endif
+autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'cs'         | let b:aurepl_use_command = g:aurepl_cs_command   | endif
 
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'javascript' | let b:csrepl_comment_format = g:csrepl_comment_format         | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'cs'         | let b:csrepl_comment_format = g:csrepl_comment_format         | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'fsharp'     | let b:csrepl_comment_format = g:csrepl_comment_format_fs      | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'vim'        | let b:csrepl_comment_format = g:csrepl_comment_format_vim     | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'clojure'    | let b:csrepl_comment_format = g:csrepl_comment_format_clojure | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'javascript' | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'cs'         | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'fsharp'     | let b:aurepl_comment_format = g:aurepl_comment_format_fs      | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
 
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'javascript' | let b:csrepl_comment_regex = g:csrepl_comment_regex         | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'cs'         | let b:csrepl_comment_regex = g:csrepl_comment_regex         | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'fsharp'     | let b:csrepl_comment_regex = g:csrepl_comment_regex_fs      | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'vim'        | let b:csrepl_comment_regex = g:csrepl_comment_regex_vim     | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_regex') && &ft ==# 'clojure'    | let b:csrepl_comment_regex = g:csrepl_comment_regex_clojure | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'javascript' | let b:aurepl_comment_regex = g:aurepl_comment_regex         | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'cs'         | let b:aurepl_comment_regex = g:aurepl_comment_regex         | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'fsharp'     | let b:aurepl_comment_regex = g:aurepl_comment_regex_fs      | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'vim'        | let b:aurepl_comment_regex = g:aurepl_comment_regex_vim     | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'clojure'    | let b:aurepl_comment_regex = g:aurepl_comment_regex_clojure | endif
 
-autocmd BufEnter * if !exists('b:csrepl_expression_start') && &ft ==# 'fsharp'     | let b:csrepl_expression_start = g:csrepl_expression_start_fs      | endif
-autocmd BufEnter * if !exists('b:csrepl_expression_start') && &ft ==# 'clojure'    | let b:csrepl_expression_start = g:csrepl_expression_start_clojure | endif
+autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'fsharp'     | let b:aurepl_expression_start = g:aurepl_expression_start_fs      | endif
+autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'clojure'    | let b:aurepl_expression_start = g:aurepl_expression_start_clojure | endif
 
-autocmd BufEnter * if &ft ==# 'cs'         | let g:csrepl_eval_inline_position = 'inline' | endif
-autocmd BufEnter * if &ft ==# 'javascript' | let g:csrepl_eval_inline_position = 'lastline' | endif
+autocmd BufEnter * if &ft ==# 'cs'         | let g:aurepl_eval_inline_position = 'inline' | endif
+autocmd BufEnter * if &ft ==# 'javascript' | let g:aurepl_eval_inline_position = 'lastline' | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalIf	"//= →.*$"  | endif
@@ -513,7 +513,7 @@ autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
 
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'cs'         | let b:csrepl_comment_format = g:csrepl_comment_format         | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'fsharp'     | let b:csrepl_comment_format = g:csrepl_comment_format_fs      | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'vim'        | let b:csrepl_comment_format = g:csrepl_comment_format_vim     | endif
-autocmd BufEnter * if !exists('b:csrepl_comment_format') && &ft ==# 'clojure'    | let b:csrepl_comment_format = g:csrepl_comment_format_clojure | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'cs'         | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'fsharp'     | let b:aurepl_comment_format = g:aurepl_comment_format_fs      | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
+autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
