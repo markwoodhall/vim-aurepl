@@ -6,14 +6,14 @@ let g:loaded_csrepl = 1
 let g:csrepl_node_command = 'node --eval "$(cat ./scratch.temp.js)" --print'
 let g:csrepl_cs_command = 'csharp ./scratch.temp.cs -warn:0'
 
-let g:csrepl_comment_format = ' //='
-let g:csrepl_comment_format_fs = ' //>'
-let g:csrepl_comment_format_vim = ' "@='
-let g:csrepl_comment_format_clojure = ' ;;='
-let g:csrepl_comment_regex = '\s*\/\/=\s.*\|\/\/=\s.*'
-let g:csrepl_comment_regex_fs = '\s*\/\/>\s.*\|\/\/>\s.*'
-let g:csrepl_comment_regex_vim = '\s"@=\s.*'
-let g:csrepl_comment_regex_clojure = '\s*;;=\s.*\|;;=\s.*'
+let g:csrepl_comment_format = '//='
+let g:csrepl_comment_format_fs = '//>'
+let g:csrepl_comment_format_vim = '"@='
+let g:csrepl_comment_format_clojure = ';;='
+let g:csrepl_comment_regex = '\/\/=\s.*'
+let g:csrepl_comment_regex_fs = '\/\/>\s.*'
+let g:csrepl_comment_regex_vim = '"@=\s.*'
+let g:csrepl_comment_regex_clojure = ';;=\s.*'
 let g:csrepl_expression_start_fs = '^\w\|^\['
 let g:csrepl_expression_start_clojure = '^(\|^\['
 
@@ -176,15 +176,19 @@ function! s:CleanUp()
   endif
 endfunction
 
-function! s:CleanLine()
+function! s:CleanLine(shuffle)
   let current_line = line('.')
   let comment = matchstr(getline(current_line), b:csrepl_comment_regex)
   let cleaned_line = substitute(getline(current_line), b:csrepl_comment_regex, 'CSREPL_PLACEHOLDER', '')
-  let cleaned_line = substitute(cleaned_line, '\s', '', 'g')
-  if cleaned_line == 'CSREPL_PLACEHOLDER'
+  let shuffle = a:shuffle
+  if cleaned_line =~ 'CSREPL_PLACEHOLDER'
     let cleaned_line = substitute(cleaned_line, 'CSREPL_PLACEHOLDER', '', 'g')
     call setline(current_line, cleaned_line)
-    call setline(current_line-1, getline(current_line-1) . ' ' . comment)
+    if shuffle
+      if substitute(cleaned_line, '\s', '', 'g') == ''
+        call setline(current_line-1, getline(current_line-1) .  comment)
+      endif
+    endif
   endif
 endfunction
 
@@ -225,7 +229,23 @@ function! s:ExpressionToRepl()
 endfunction
 
 function! s:SupressLineOutput(line_number)
-  return ((substitute(getline(a:line_number), '\s', '', 'g') != '') && &ft ==# 'clojure' && (matchstr(split(getline(a:line_number), b:csrepl_comment_format)[0], ')\s*$') == '' || substitute(split(getline(a:line_number+1), b:csrepl_comment_format)[0], '\s', '', 'g') != ''))
+  if &ft ==# 'clojure'
+    let non_empty_line = (substitute(getline(a:line_number), '\s', '', 'g') != '')
+    let parts = split(getline(a:line_number), b:csrepl_comment_format)
+    let end_of_expression = 0
+    if len(parts) > 0
+      let end_of_expression = (matchstr(parts[0], ')$\|)\s*$') != '')
+    endif
+
+    let next_parts = split(getline(a:line_number+1), b:csrepl_comment_format)
+    let next_line_empty = 1
+    if len(next_parts) > 0
+      let next_line_empty = substitute(next_parts[0], '\s', '', 'g') == ''
+    endif
+
+    return (non_empty_line && (!end_of_expression || !next_line_empty))
+  endif
+  return 0
 endfunction
 
 function! s:LinesToRepl(start_line, end_line)
@@ -294,7 +314,6 @@ endfunction
 
 function! s:Repl(repl_type)
   execute 'vsplit __REPL__.'.a:repl_type
-  setlocal readonly
 endfunction
 
 function! s:TagUnderCursor(tagtype)
@@ -388,29 +407,31 @@ autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
 
-autocmd CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine() | endif
-autocmd CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
+autocmd InsertEnter * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
+autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
+autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
 
-autocmd CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine() | endif
-autocmd CursorMovedI,InsertLeave * if &ft ==# 'fsharp' && ((len(split(getline('.'), '"')) - 1) % 2) == 0 | silent! call s:ExpressionToRepl() | endif
+autocmd InsertEnter * if &ft ==# 'fsharp' | call s:CleanLine(0) | endif
+autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine(1) | endif
+autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' && ((len(split(getline('.'), '"')) - 1) % 2) == 0 | silent! call s:ExpressionToRepl() | endif
 
-autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine() | endif
+autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine(0) | endif
 autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
 
 autocmd BufWritePre * silent call s:CleanUp()
 autocmd BufLeave * silent call s:CleanUp()
 
-autocmd BufWritePre *.cs,*.js silent! %s/\s\/\/=\s.*//g
-autocmd BufLeave *.cs,*.js silent! %s/\s\/\/=\s.*//g
+autocmd BufWritePre *.cs,*.js silent! %s/\/\/=\s.*//g
+autocmd BufLeave *.cs,*.js silent! %s/\/\/=\s.*//g
 
-autocmd BufWritePre *.fs,*.fsx silent! %s/\s\/\/>\s.*//g
-autocmd BufLeave *.fs,*.fsx silent! %s/\s\/\/>\s.*//g
+autocmd BufWritePre *.fs,*.fsx silent! %s/\/\/>\s.*//g
+autocmd BufLeave *.fs,*.fsx silent! %s/\/\/>\s.*//g
 
-autocmd BufWritePre *.vim silent! %s/\s"@=\s.*//g
-autocmd BufLeave *.vim silent! %s/\s"@=\s.*//g
+autocmd BufWritePre *.vim silent! %s/"@=\s.*//g
+autocmd BufLeave *.vim silent! %s/"@=\s.*//g
 
-autocmd BufWritePre *.clj,*.cljs,*.cljc silent! %s/\s;;=\s.*//g
-autocmd BufLeave *.clj,*.cljs,*.cljc silent! %s/\s;;=\s.*//g
+autocmd BufWritePre *.clj,*.cljs,*.cljc silent! %s/;;=\s.*//g
+autocmd BufLeave *.clj,*.cljs,*.cljc silent! %s/;;=\s.*//g
 
 autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
@@ -443,14 +464,12 @@ autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn mat
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalSwitch	"//= ⊃.*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalEvaluation	"//= ≡.*$"  | endif
 
-
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"@= .*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs'         | syn match csEvalError		"//= (\d,\d): error.*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
-
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'        | syn match csEvalError		"\"@= error.*$"         | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'    | syn match csEvalError		";;= error.*$"          | endif
