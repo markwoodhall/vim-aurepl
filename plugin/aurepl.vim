@@ -274,7 +274,6 @@ function! s:SupressLineOutput(line_number)
     if len(parts) > 0
       let trailing_equals = matchstr(parts[0], '=$\|=\s*$') != ''
     endif
-    echomsg trailing_equals
     return trailing_equals
   else
     return 0
@@ -289,7 +288,7 @@ function! s:SupressEval(line_number)
     if substitute(getline(a:line_number), '\s', '', 'g') == ''
       return 1
     endif
-    let next_not_empty = substitute(getline(a:line_number+1), '\s', '', 'g') != ''
+    let next_indented = matchstr(getline(a:line_number+1), '^\s\s\s\s*.*')
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let hanging_equals = 0
     let in_quotes = 0
@@ -297,7 +296,7 @@ function! s:SupressEval(line_number)
       let in_quotes = ((len(split(parts[0], '"')) - 1) % 2) == 1
       let hanging_equals = matchstr(parts[0], '=$\|=\s*$') != ''
     endif
-    return next_not_empty || hanging_equals || in_quotes
+    return next_indented || hanging_equals || in_quotes
   else
     return 0
   endif
