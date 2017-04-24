@@ -18,6 +18,8 @@ let g:aurepl_comment_regex_clojure = ';;=\s.*'
 let g:aurepl_expression_start_fs = '^\w\|^\['
 let g:aurepl_expression_start_clojure = '^(\|^\['
 
+let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)'
+
 let s:range_added = []
 
 if !exists('g:aurepl_eval_inline')
@@ -126,7 +128,11 @@ function! s:SendToRepl(line_offset, data)
           endif
         endfor
         for e in expressions
-          let out_array = out_array + [fireplace#session_eval(join(e, ''), {"ns": "user"})]
+          if join(e, '') =~ g:aurepl_warn_on_slow_expressions_regex
+            let out_array = out_array + ['warning: Ignoring infinite expression']
+          else
+            let out_array = out_array + [fireplace#session_eval(join(e, ''), {"ns": "user"})]
+          endif
         endfor
         let out = join(out_array, "\n")
       catch
@@ -220,6 +226,19 @@ function! s:LineToRepl()
 endfunction
 
 function! s:ExpressionToRepl()
+  if &ft ==# 'clojure'
+    let open = '[[{(]'
+    let close = '[]})]'
+    let [start_line, start_col] = searchpairpos(open, '', close, 'Wrnb')
+    let [end_line, end_col] = searchpairpos(open, '', close, 'Wrnc')
+    if start_line != 0 && end_line != 0 && start_col != 0 && end_col != 0
+      call s:LinesToRepl(start_line, end_line)
+      return
+    endif
+    if getpos('.') == [0, 1, 1, 0]
+      return
+    endif
+  endif
   let start_line = 1
   let end_line = line('.')
   let counter = end_line
@@ -263,10 +282,14 @@ function! s:SupressLineOutput(line_number)
 endfunction
 
 function! s:SupressEval(line_number)
+  if &ft ==# 'clojure'
+    return matchstr(getline(a:line_number), '^\s*[(\|\[].*[)|\]]$\|^[(\|\[].*[)\|\]]$') == ''
+  endif
   if &ft ==# 'fsharp'
     if substitute(getline(a:line_number), '\s', '', 'g') == ''
       return 1
     endif
+    let next_not_empty = substitute(getline(a:line_number+1), '\s', '', 'g') != ''
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let hanging_equals = 0
     let in_quotes = 0
@@ -274,7 +297,7 @@ function! s:SupressEval(line_number)
       let in_quotes = ((len(split(parts[0], '"')) - 1) % 2) == 1
       let hanging_equals = matchstr(parts[0], '=$\|=\s*$') != ''
     endif
-    return hanging_equals || in_quotes
+    return next_not_empty || hanging_equals || in_quotes
   else
     return 0
   endif
@@ -442,12 +465,12 @@ autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor
 
 if g:aurepl_eval_on_type == 1
   autocmd InsertEnter * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' && !s:SupressEval(line('.')) | silent! call s:ExpressionToRepl() | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(1) | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
 
   autocmd InsertEnter * if &ft ==# 'fsharp' | call s:CleanLine(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine(1) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' && !s:SupressEval(line('.')) | call s:ExpressionToRepl() | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp'  && !s:SupressEval(line('.')) | silent! call s:ExpressionToRepl() | endif
 
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine(0) | endif
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
@@ -493,6 +516,7 @@ autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn mat
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"\"= .*$"| endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEvalWarn	";;= warning: .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs'         | syn match csEvalError		"//= (\d,\d): error.*$" | endif
@@ -510,6 +534,7 @@ autocmd BufEnter * hi csEvalIf guifg=#fff guibg=#5D0089
 autocmd BufEnter * hi csEvalSwitch guifg=#fff guibg=#5F9181
 autocmd BufEnter * hi csEvalEvaluation guifg=#fff guibg=#3F3591
 autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
+autocmd BufEnter * hi csEvalWarn guifg=#fff guibg=#8C7A37
 autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
 
