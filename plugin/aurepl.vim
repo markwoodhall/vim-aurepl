@@ -473,6 +473,9 @@ if g:aurepl_eval_on_type == 1
 
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine(0) | endif
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
+
+  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' | call s:CleanLine(0) | endif
+  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
 endif
 
 autocmd BufWritePre,BufLeave * silent call s:CleanUp()

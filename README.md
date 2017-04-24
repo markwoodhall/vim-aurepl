@@ -2,10 +2,21 @@
 
 To enable easy repl integration in vim. The inspiration for much of this is LightTables Instarepl and Emacs CIDER inline eval.
 
+This plugin also offers "As you type" evalutation, like below.
+
+![Imgur](http://i.imgur.com/8AgrdI3.gif)
+
+This functionality can be switched off with the following config.
+
+```viml
+let g:aurepl_eval_on_type = 0
+```
+
 ## Requirements
 
-At the moment this plugin has support for C# and JavaScript. The underlying C# evalutation is done using the 
-Mono csharp repl. The JavaScript implementation makes use of `node --eval`.
+At the moment this plugin has support for C#, JavaScript, F#, and Clojure. 
+
+The underlying C# evalutation is done using the Mono csharp repl. The JavaScript implementation makes use of `node --eval`. The F# version works on top of the [vim-fsharp](https://github.com/fsharp/vim-fsharp) plugin, and the Clojure integration makes use of [vim-fireplace](https://github.com/tpope/vim-fireplace).
 
 ## Installation
 
