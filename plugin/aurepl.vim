@@ -34,6 +34,14 @@ if !exists('g:aurepl_eval_inline_cs_experimental')
   let g:aurepl_eval_inline_cs_experimental = 1
 endif
 
+if !exists('g:aurepl_eval_inline_collapse')
+  let g:aurepl_eval_inline_collapse = 1
+endif
+
+if !exists('g:aurepl_eval_inline_max')
+  let g:aurepl_eval_inline_max = 75
+endif
+
 if !exists('g:aurepl_eval_on_type')
   let g:aurepl_eval_on_type = 1
 endif
@@ -343,6 +351,9 @@ function! s:LinesToRepl(start_line, end_line)
           let linenumber = matchstr(c, ':\d*:')[1:-2]
           let parts = split(getline(linenumber), b:aurepl_comment_format)
           if len(parts) > 0
+            if g:aurepl_eval_inline_collapse
+              let c = c[0:g:aurepl_eval_inline_max]
+            endif
             call setline(linenumber, parts[0] . b:aurepl_comment_format .' '.substitute(substitute(c, ':\d*:', '', ''), '^\s*', '', ''))
           endif
         endfor
@@ -352,8 +363,22 @@ function! s:LinesToRepl(start_line, end_line)
           while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:SupressLineOutput(counter))
             let counter = counter - 1
           endwhile
+          let b:aurepl_last_out[counter] = m
           let parts = split(getline(counter), b:aurepl_comment_format)
           if len(parts) > 0
+            if g:aurepl_eval_inline_collapse
+              if index(b:aurepl_expanded, counter) < 0
+                let m = m[0:g:aurepl_eval_inline_max]
+                let no_space = substitute(m, '\s', '', 'g')
+                if no_space[0] == '(' && no_space[-1:-1] != ')'
+                  let m = m .' ...)'
+                elseif no_space[0] == '{' && no_space[-1:-1] != '}'
+                  let m = m .' ...}'
+                elseif no_space[0] == '[' && no_space[-1:-1] != ']'
+                  let m = m .' ...]'
+                endif
+              endif
+            endif
             call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
           endif
           let counter = (counter > a:start_line) ? counter - 1 : counter
@@ -368,6 +393,16 @@ endfunction
 
 function! s:Repl(repl_type)
   execute 'vsplit __REPL__.'.a:repl_type
+endfunction
+
+function! s:ExpandOutput()
+  let line_number = line('.')
+  let parts = split(getline(line_number), b:aurepl_comment_format)
+  if len(parts) > 0
+    let m = b:aurepl_last_out[line_number]
+    let b:aurepl_expanded += [line_number]
+    call setline(line_number, parts[0] . b:aurepl_comment_format .' '.m)
+  endif
 endfunction
 
 function! s:TagUnderCursor(tagtype)
@@ -458,6 +493,10 @@ autocmd filetype * command! -buffer LineToRepl :call s:LineToRepl()
 autocmd filetype clojure,fsharp command! -buffer ExpressionToRepl :call s:ExpressionToRepl()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
 
+if g:aurepl_eval_inline_collapse
+  autocmd filetype * command! -buffer ExpandOutput :call s:ExpandOutput()
+endif
+
 autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
@@ -489,6 +528,13 @@ autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
 autocmd filetype * nnoremap <silent> cpl :LineToRepl<CR>
 autocmd filetype * vnoremap <silent> cps :SelectionToRepl<CR>
+
+if g:aurepl_eval_inline_collapse
+  autocmd filetype * nnoremap <silent> cpa :ExpandOutput<CR>
+endif
+
+autocmd BufEnter *  let b:aurepl_last_out = {}
+autocmd BufEnter *  let b:aurepl_expanded = []
 
 autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'javascript' | let b:aurepl_use_command = g:aurepl_node_command | endif
 autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'cs'         | let b:aurepl_use_command = g:aurepl_cs_command   | endif
