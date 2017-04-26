@@ -8,11 +8,8 @@ let g:aurepl_node_command = 'node --eval "$(cat ./scratch.temp.js)" --print'
 
 let g:aurepl_comment_format = '//='
 let g:aurepl_comment_format_vim = '"@='
-let g:aurepl_comment_format_clojure = ';;='
 let g:aurepl_comment_regex = '\/\/=\s.*'
 let g:aurepl_comment_regex_vim = '"@=\s.*'
-let g:aurepl_comment_regex_clojure = ';;=\s.*'
-let g:aurepl_expression_start_clojure = '^(\|^\['
 
 let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)'
 
@@ -402,19 +399,14 @@ autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
 autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')
 autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
 autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
+autocmd filetype * command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call aurepl#selection_to_repl() | call winrestview(b:winview)
-
-autocmd filetype clojure,fsharp command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
 
 if g:aurepl_eval_inline_collapse
   autocmd filetype * command! -buffer ExpandOutput :call s:expand_output()
 endif
 
 if g:aurepl_eval_on_type == 1
-  autocmd InsertEnter * if &ft ==# 'clojure' | call aurepl#clean_line(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call aurepl#clean_line(1) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call aurepl#expression_to_repl() | endif
-
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' | call aurepl#clean_line(0) | endif
   autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' && matchstr(getline('.'), ';$') == ';' | silent! call aurepl#file_to_repl() | endif
 endif
@@ -423,7 +415,6 @@ autocmd BufWritePre,BufLeave * silent call s:clean_up()
 autocmd BufWritePre,BufLeave *.js execute "silent! %s/".g:aurepl_comment_regex."//g"
 autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:aurepl_comment_regex_fs."//g"
 autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:aurepl_comment_regex_vim."//g"
-autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:aurepl_comment_regex_clojure."//g"
 
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
@@ -441,13 +432,9 @@ autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'javascript' | 
 
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'javascript' | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
 
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'javascript' | let b:aurepl_comment_regex = g:aurepl_comment_regex         | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'vim'        | let b:aurepl_comment_regex = g:aurepl_comment_regex_vim     | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'clojure'    | let b:aurepl_comment_regex = g:aurepl_comment_regex_clojure | endif
-
-autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'clojure'    | let b:aurepl_expression_start = g:aurepl_expression_start_clojure | endif
 
 autocmd BufEnter * if &ft ==# 'javascript' | let g:aurepl_eval_inline_position = 'lastline' | endif
 
@@ -457,13 +444,10 @@ autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalSwitch	
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalEvaluation	"//= ≡.*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"\"= .*$"| endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEvalWarn	";;= warning: .*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'        | syn match csEvalError		"\"\"= .*$"             | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'    | syn match csEvalError		";;= error.*$"          | endif
 
 autocmd InsertLeave,BufEnter * syn match csZshError		  "//= zsh:\d: .*$"
 autocmd InsertLeave,BufEnter * syn match csBashError		"//= bash:\d: .*$"
@@ -478,4 +462,3 @@ autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
 
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
