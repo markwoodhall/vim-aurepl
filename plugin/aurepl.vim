@@ -414,7 +414,6 @@ endif
 
 autocmd BufWritePre,BufLeave * silent call s:clean_up()
 autocmd BufWritePre,BufLeave *.js execute "silent! %s/".g:aurepl_comment_regex."//g"
-autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:aurepl_comment_regex_fs."//g"
 autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:aurepl_comment_regex_vim."//g"
 
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>

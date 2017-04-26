@@ -11,6 +11,8 @@ endif
 
 autocmd filetype fsharp command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
 
+autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:aurepl_comment_regex_fs."//g"
+
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'fsharp'     | let b:aurepl_comment_format = g:aurepl_comment_format_fs      | endif
 autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'fsharp' | let b:aurepl_expression_start = g:aurepl_expression_start_fs | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'fsharp'     | let b:aurepl_comment_regex = g:aurepl_comment_regex_fs      | endif
