@@ -394,6 +394,7 @@ function! s:expand_output()
   endif
 endfunction
 
+autocmd filetype * command! -buffer CsRepl :exe aurepl#repl('cs')
 autocmd filetype * command! -buffer ClojureRepl :exe aurepl#repl('clj')
 autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
 autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')

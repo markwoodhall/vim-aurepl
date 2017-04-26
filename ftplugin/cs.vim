@@ -96,9 +96,6 @@ endif
 
 autocmd BufWritePre,BufLeave *.cs execute "silent! %s/".g:aurepl_comment_regex."//g"
 
-autocmd filetype * command! -buffer CsRepl :exe aurepl#repl('cs')
-autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
-
 autocmd BufEnter * if &ft ==# 'cs' | let g:aurepl_eval_inline_position = 'inline' | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'cs' | syn match csEval	"//= .*$"  | endif
