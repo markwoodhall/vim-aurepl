@@ -5,7 +5,6 @@ endif
 let g:loaded_aurepl = 1
 
 let g:aurepl_node_command = 'node --eval "$(cat ./scratch.temp.js)" --print'
-let g:aurepl_cs_command = 'csharp ./scratch.temp.cs -warn:0'
 
 let g:aurepl_comment_format = '//='
 let g:aurepl_comment_format_fs = '//>'
@@ -30,10 +29,6 @@ if !exists('g:aurepl_eval_inline_position')
   let g:aurepl_eval_inline_position = 'inline'
 endif
 
-if !exists('g:aurepl_eval_inline_cs_experimental')
-  let g:aurepl_eval_inline_cs_experimental = 1
-endif
-
 if !exists('g:aurepl_eval_inline_collapse')
   let g:aurepl_eval_inline_collapse = 1
 endif
@@ -46,7 +41,7 @@ if !exists('g:aurepl_eval_on_type')
   let g:aurepl_eval_on_type = 1
 endif
 
-function! s:VimEval(data)
+function! s:vim_eval(data)
   let out = ''
   for d in a:data
     try
@@ -59,7 +54,7 @@ function! s:VimEval(data)
   return out
 endfunction
 
-function! s:SendToRepl(line_offset, data)
+function! aurepl#send_to_repl(line_offset, data)
   let counter = 1 + a:line_offset
   let clean_data = []
   if &ft ==# 'cs'
@@ -120,7 +115,7 @@ function! s:SendToRepl(line_offset, data)
     call delete('scratch.temp.'.expand('%:e'))
   else
     if &ft ==# 'vim'
-      let out = s:VimEval(clean_data)
+      let out = s:vim_eval(clean_data)
     endif
     if &ft ==# 'clojure'
       try
@@ -185,7 +180,7 @@ function! s:SendToRepl(line_offset, data)
   return trimmed
 endfunction
 
-function! s:CleanUp()
+function! s:clean_up()
   if g:aurepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
     for r in reverse(s:range_added)
       let [fromline, toline] = r
@@ -195,7 +190,7 @@ function! s:CleanUp()
   endif
 endfunction
 
-function! s:CleanLine(shuffle)
+function! aurepl#clean_line(shuffle)
   let current_line = line('.')
   let comment = matchstr(getline(current_line), b:aurepl_comment_regex)
   let cleaned_line = substitute(getline(current_line), b:aurepl_comment_regex, 'CSREPL_PLACEHOLDER', '')
@@ -211,7 +206,7 @@ function! s:CleanLine(shuffle)
   endif
 endfunction
 
-function! s:SelectionToRepl() range
+function! aurepl#selection_to_repl() range
   let old_reg = getreg('"')
   let old_regtype = getregtype('"')
   let old_clipboard = &clipboard
@@ -222,25 +217,25 @@ function! s:SelectionToRepl() range
   let &clipboard = old_clipboard
   let firstline = getpos("'<")[1]
   let lastline = getpos("'>")[1]
-  call s:LinesToRepl(firstline, lastline)
+  call s:lines_to_repl(firstline, lastline)
 endfunction
 
-function! s:FileToRepl()
-  call s:LinesToRepl(1, line('$'))
+function! aurepl#file_to_repl()
+  call s:lines_to_repl(1, line('$'))
 endfunction
 
-function! s:LineToRepl()
-  call s:LinesToRepl(line('.'), line('.'))
+function! aurepl#line_to_repl()
+  call s:lines_to_repl(line('.'), line('.'))
 endfunction
 
-function! s:ExpressionToRepl()
+function! aurepl#expression_to_repl()
   if &ft ==# 'clojure'
     let open = '[[{(]'
     let close = '[]})]'
     let [start_line, start_col] = searchpairpos(open, '', close, 'Wrnb')
     let [end_line, end_col] = searchpairpos(open, '', close, 'Wrnc')
     if start_line != 0 && end_line != 0 && start_col != 0 && end_col != 0
-      call s:LinesToRepl(start_line, end_line)
+      call s:lines_to_repl(start_line, end_line)
       return
     endif
     if getpos('.') == [0, 1, 1, 0]
@@ -251,16 +246,16 @@ function! s:ExpressionToRepl()
   let end_line = line('.')
   let counter = end_line
   if matchstr(getline(end_line), b:aurepl_expression_start) != ''
-    call s:LinesToRepl(end_line, line('.'))
+    call s:lines_to_repl(end_line, line('.'))
     return
   endif
   while counter > start_line && matchstr(getline(counter), b:aurepl_expression_start) == ''
     let counter -= 1
   endwhile
-  call s:LinesToRepl(counter, line('.'))
+  call s:lines_to_repl(counter, line('.'))
 endfunction
 
-function! s:SupressLineOutput(line_number)
+function! s:suppress_line_output(line_number)
   if &ft ==# 'clojure'
     let non_empty_line = (substitute(getline(a:line_number), '\s', '', 'g') != '')
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
@@ -288,7 +283,7 @@ function! s:SupressLineOutput(line_number)
   endif
 endfunction
 
-function! s:SupressEval(line_number)
+function! s:suppress_eval(line_number)
   if &ft ==# 'clojure'
     return matchstr(getline(a:line_number), '^\s*[(\|\[].*[)|\]]$\|^[(\|\[].*[)\|\]]$') == ''
   endif
@@ -310,13 +305,13 @@ function! s:SupressEval(line_number)
   endif
 endfunction
 
-function! s:LinesToRepl(start_line, end_line)
+function! s:lines_to_repl(start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
   let start_offset = a:start_line
   if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
     let start_offset -= 1
   endif
-  let out = s:SendToRepl(start_offset, lines)
+  let out = aurepl#send_to_repl(start_offset, lines)
   let commented = []
   for m in out
     let commented = commented + [b:aurepl_comment_format .' '.m]
@@ -360,7 +355,7 @@ function! s:LinesToRepl(start_line, end_line)
       else
         let counter = a:end_line
         for m in reverse(out)
-          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:SupressLineOutput(counter))
+          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(counter))
             let counter = counter - 1
           endwhile
           let b:aurepl_last_out[counter] = m
@@ -391,11 +386,11 @@ function! s:LinesToRepl(start_line, end_line)
   endif
 endfunction
 
-function! s:Repl(repl_type)
+function! aurepl#repl(repl_type)
   execute 'vsplit __REPL__.'.a:repl_type
 endfunction
 
-function! s:ExpandOutput()
+function! s:expand_output()
   let line_number = line('.')
   let parts = split(getline(line_number), b:aurepl_comment_format)
   if len(parts) > 0
@@ -405,125 +400,38 @@ function! s:ExpandOutput()
   endif
 endfunction
 
-function! s:TagUnderCursor(tagtype)
-  let line = getline('.')
-  let line = substitute(line, '##\s', '', 'g')
-  if a:tagtype == 'namespace'
-    call s:Types(line)
-  endif
+autocmd filetype * command! -buffer ClojureRepl :exe aurepl#repl('clj')
+autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
+autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')
+autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
+autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
+autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call aurepl#selection_to_repl() | call winrestview(b:winview)
 
-  if a:tagtype == 'type'
-    call s:Functions(line)
-  endif
-endfunction
-
-function! s:Namespaces()
-  let out = s:SendToRepl(0, ['using System.Reflection;', 'AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).Select(t => t.Namespace).Where(n => !string.IsNullOrEmpty(n)).Distinct()'])
-  let namespaces = eval(substitute(substitute(out[-1], '{', '[', 'g'), '}', ']', 'g'))
-  let lines = ['# Namespaces', '', 'This is a current list of loaded namespaces, follow a namespace by pressing F on it.', '']
-  for n in namespaces
-    let lines = lines + ['## '.n]
-  endfor
-  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
-  execute command '__Namespaces.cs'
-    setlocal filetype=markdown
-    setlocal buftype=nofile
-    let b:aurepl_use_command = g:aurepl_cs_command
-  call append(0, lines)
-  normal! gg
-  nnoremap <buffer> <ESC> :q<CR>
-  nnoremap <silent> <buffer> F :NamespaceUnderCursor<CR>
-endfunction
-
-function! s:Types(namespace)
-  let out = s:SendToRepl(0, ['using System.Reflection;', 'AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).Where(t => t.Namespace == "'.a:namespace.'").Select(t => t.FullName).Distinct()'])
-  let types = eval(substitute(substitute(out[-1], '{', '[', 'g'), '}', ']', 'g'))
-  let lines = ['# '.a:namespace, '', 'This is a list of types within the '.a:namespace.' namespace, follow a type by pressing F on it.', '']
-  for t in types
-    let lines = lines + ['## '.t]
-  endfor
-  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
-  execute command '__Namespaces.cs'
-    setlocal filetype=markdown
-    setlocal buftype=nofile
-    let b:aurepl_use_command = g:aurepl_cs_command
-  call append(0, lines)
-  normal! gg
-  nnoremap <buffer> <ESC> :q<CR>
-  nnoremap <silent> <buffer> F :TypeUnderCursor<CR>
-endfunction
-
-function! s:Functions(typename)
-  let out = s:SendToRepl(0, [
-        \ 'using System.Reflection;', 
-        \ 'AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).Where(t => t.FullName == "'.a:typename.'").SelectMany(t => t.GetConstructors()).Where(m => m.IsPublic).Select(m => m.ToString()).Distinct()',
-        \ 'AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).Where(t => t.FullName == "'.a:typename.'").SelectMany(t => t.GetMethods()).Where(m => m.IsPublic).Select(m => m.ToString()).Distinct()',
-        \ 'AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).Where(t => t.FullName == "'.a:typename.'").SelectMany(t => t.GetProperties()).Where(m => m.CanRead || m.CanWrite).Select(m => m.ToString()).Distinct()'])
-  let constructors = eval(substitute(substitute(out[-3], '{', '[', 'g'), '}', ']', 'g'))
-  let functions = eval(substitute(substitute(out[-2], '{', '[', 'g'), '}', ']', 'g'))
-  let properties = eval(substitute(substitute(out[-1], '{', '[', 'g'), '}', ']', 'g'))
-  let lines = ['# '.a:typename, '', '## Constructors', '']
-  for con in constructors
-    let lines = lines + ['  > '.con]
-  endfor
-  let lines = lines + ['', '## Functions', '']
-  for f in functions
-    let lines = lines + ['  > '.f]
-  endfor
-  let lines = lines + ['', '## Properties', '']
-  for p in properties
-    let lines = lines + ['  > '.p]
-  endfor
-  let command = expand('%b') =~ '__Namespaces.cs' ? 'e' : 'split'
-  execute command '__Namespaces.cs'
-    setlocal filetype=markdown
-    setlocal buftype=nofile
-    let b:aurepl_use_command = g:aurepl_cs_command
-  call append(0, lines)
-  normal! gg
-  nnoremap <buffer> <ESC> :q<CR>
-endfunction
-
-autocmd filetype * command! -buffer CsRepl :exe s:Repl('cs')
-autocmd filetype * command! -buffer ClojureRepl :exe s:Repl('clj')
-autocmd filetype * command! -buffer FsRepl :exe s:Repl('fsx')
-autocmd filetype * command! -buffer JsRepl :exe s:Repl('js')
-autocmd filetype * command! -buffer FileToRepl :call s:FileToRepl()
-autocmd filetype * command! -buffer LineToRepl :call s:LineToRepl()
-autocmd filetype clojure,fsharp command! -buffer ExpressionToRepl :call s:ExpressionToRepl()
-autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call s:SelectionToRepl() | call winrestview(b:winview)
+autocmd filetype clojure,fsharp command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
 
 if g:aurepl_eval_inline_collapse
-  autocmd filetype * command! -buffer ExpandOutput :call s:ExpandOutput()
+  autocmd filetype * command! -buffer ExpandOutput :call s:expand_output()
 endif
-
-autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
-autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
-autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
 
 if g:aurepl_eval_on_type == 1
-  autocmd InsertEnter * if &ft ==# 'clojure' | call s:CleanLine(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call s:CleanLine(1) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call s:ExpressionToRepl() | endif
+  autocmd InsertEnter * if &ft ==# 'clojure' | call aurepl#clean_line(0) | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | call aurepl#clean_line(1) | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'clojure' | silent! call aurepl#expression_to_repl() | endif
 
-  autocmd InsertEnter * if &ft ==# 'fsharp' | call s:CleanLine(0) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call s:CleanLine(1) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp'  && !s:SupressEval(line('.')) | silent! call s:ExpressionToRepl() | endif
+  autocmd InsertEnter * if &ft ==# 'fsharp' | call aurepl#clean_line(0) | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp' | call aurepl#clean_line(1) | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if &ft ==# 'fsharp'  && !s:suppress_eval(line('.')) | silent! call aurepl#expression_to_repl() | endif
 
-  autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' | call s:CleanLine(0) | endif
-  autocmd CursorMovedI,InsertLeave * if &ft ==# 'cs' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
-
-  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' | call s:CleanLine(0) | endif
-  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' && matchstr(getline('.'), ';$') == ';' | silent! call s:FileToRepl() | endif
+  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' | call aurepl#clean_line(0) | endif
+  autocmd CursorMovedI,InsertLeave * if &ft ==# 'javascript' && matchstr(getline('.'), ';$') == ';' | silent! call aurepl#file_to_repl() | endif
 endif
 
-autocmd BufWritePre,BufLeave * silent call s:CleanUp()
-autocmd BufWritePre,BufLeave *.cs,*.js execute "silent! %s/".g:aurepl_comment_regex."//g"
+autocmd BufWritePre,BufLeave * silent call s:clean_up()
+autocmd BufWritePre,BufLeave *.js execute "silent! %s/".g:aurepl_comment_regex."//g"
 autocmd BufWritePre,BufLeave *.fs,*.fsx execute "silent! %s/".g:aurepl_comment_regex_fs."//g"
 autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:aurepl_comment_regex_vim."//g"
 autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:aurepl_comment_regex_clojure."//g"
 
-autocmd filetype * nnoremap <silent> csr :CsRepl<CR>
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
 autocmd filetype * nnoremap <silent> cpl :LineToRepl<CR>
@@ -537,16 +445,13 @@ autocmd BufEnter *  let b:aurepl_last_out = {}
 autocmd BufEnter *  let b:aurepl_expanded = []
 
 autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'javascript' | let b:aurepl_use_command = g:aurepl_node_command | endif
-autocmd BufEnter * if !exists('b:aurepl_use_command') && &ft ==# 'cs'         | let b:aurepl_use_command = g:aurepl_cs_command   | endif
 
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'javascript' | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'cs'         | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'fsharp'     | let b:aurepl_comment_format = g:aurepl_comment_format_fs      | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
 
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'javascript' | let b:aurepl_comment_regex = g:aurepl_comment_regex         | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'cs'         | let b:aurepl_comment_regex = g:aurepl_comment_regex         | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'fsharp'     | let b:aurepl_comment_regex = g:aurepl_comment_regex_fs      | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'vim'        | let b:aurepl_comment_regex = g:aurepl_comment_regex_vim     | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'clojure'    | let b:aurepl_comment_regex = g:aurepl_comment_regex_clojure | endif
@@ -554,20 +459,18 @@ autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'clojure'    
 autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'fsharp'     | let b:aurepl_expression_start = g:aurepl_expression_start_fs      | endif
 autocmd BufEnter * if !exists('b:aurepl_expression_start') && &ft ==# 'clojure'    | let b:aurepl_expression_start = g:aurepl_expression_start_clojure | endif
 
-autocmd BufEnter * if &ft ==# 'cs'         | let g:aurepl_eval_inline_position = 'inline' | endif
 autocmd BufEnter * if &ft ==# 'javascript' | let g:aurepl_eval_inline_position = 'lastline' | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalIf	"//= →.*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalSwitch	"//= ⊃.*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs' || &ft ==# 'javascript' | syn match csEvalEvaluation	"//= ≡.*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalIf	"//= →.*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalSwitch	"//= ⊃.*$"  | endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalEvaluation	"//= ≡.*$"  | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"\"= .*$"| endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEval	";;= .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'clojure'                    | syn match csEvalWarn	";;= warning: .*$"  | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'fsharp'                     | syn match csEval	"//> .*$"  | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'cs'         | syn match csEvalError		"//= (\d,\d): error.*$" | endif
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'vim'        | syn match csEvalError		"\"\"= .*$"             | endif
@@ -586,7 +489,6 @@ autocmd BufEnter * hi csEvalWarn guifg=#fff guibg=#8C7A37
 autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
 
-autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'cs'         | let b:aurepl_comment_format = g:aurepl_comment_format         | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'fsharp'     | let b:aurepl_comment_format = g:aurepl_comment_format_fs      | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim'        | let b:aurepl_comment_format = g:aurepl_comment_format_vim     | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'clojure'    | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
