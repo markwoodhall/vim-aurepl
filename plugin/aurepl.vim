@@ -439,11 +439,8 @@ autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'vim'        
 autocmd BufEnter * if &ft ==# 'javascript' | let g:aurepl_eval_inline_position = 'lastline' | endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEval	"//= .*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalIf	"//= →.*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalSwitch	"//= ⊃.*$"  | endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalEvaluation	"//= ≡.*$"  | endif
 
-autocmd InsertLeave,BufEnter * if &ft ==# 'vim'                        | syn match csEval	"\"\"= .*$"| endif
+autocmd InsertLeave,BufEnter * if &ft ==# 'vim' | syn match csEval	"\"\"= .*$"| endif
 
 autocmd InsertLeave,BufEnter * if &ft ==# 'javascript' | syn match csEvalError		"//= .*: .*$"           | endif
 
