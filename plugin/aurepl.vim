@@ -291,15 +291,17 @@ function! aurepl#supress_eval(line_number)
     if substitute(getline(a:line_number), '\s', '', 'g') == ''
       return 1
     endif
-    let next_indented = matchstr(getline(a:line_number+1), '^\s\s\s\s*.*')
-    let parts = split(getline(a:line_number), b:aurepl_comment_format)
+    let next_indented = matchstr(getline(a:line_number+1), '^\s\s\s\s*.*') != ''
+    let next_piped = matchstr(getline(a:line_number+1), '^\s*|>.*\||>.*') != ''
+    let prev_piped = matchstr(getline(a:line_number-1), '^\s*|>.*\||>.*') != ''
+    let parts = split(getline(a:line_number), b:aurepl_comment_format) 
     let hanging_equals = 0
     let in_quotes = 0
     if len(parts) > 0
       let in_quotes = ((len(split(parts[0], '"')) - 1) % 2) == 1
       let hanging_equals = matchstr(parts[0], '=$\|=\s*$') != ''
     endif
-    return next_indented || hanging_equals || in_quotes
+    return next_indented || next_piped || prev_piped || hanging_equals || in_quotes
   else
     return 0
   endif
