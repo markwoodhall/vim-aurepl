@@ -11,6 +11,8 @@ let g:aurepl_comment_format_vim = '"@='
 let g:aurepl_comment_regex = '\/\/=\s.*'
 let g:aurepl_comment_regex_vim = '"@=\s.*'
 
+let g:aurepl_repl_buffer_name = '__REPL__'
+
 let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)'
 
 let s:range_added = []
@@ -33,6 +35,10 @@ endif
 
 if !exists('g:aurepl_eval_on_type')
   let g:aurepl_eval_on_type = 1
+endif
+
+if !exists('g:aurepl_eval_on_type_in_all_buffers')
+  let g:aurepl_eval_on_type_in_all_buffers = 0
 endif
 
 function! s:vim_eval(data)
@@ -381,7 +387,7 @@ function! s:lines_to_repl(start_line, end_line)
 endfunction
 
 function! aurepl#repl(repl_type)
-  execute 'vsplit __REPL__.'.a:repl_type
+  execute 'vsplit ' g:aurepl_repl_buffer_name . '.' . a:repl_type
 endfunction
 
 function! s:expand_output()
