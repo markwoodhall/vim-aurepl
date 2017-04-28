@@ -296,7 +296,7 @@ function! aurepl#supress_eval(line_number)
     let hanging_equals = 0
     let in_quotes = 0
     if len(parts) > 0
-      let in_quotes = ((len(split(parts[0], '"')) - 1) % 2) == 1
+      let in_quotes = (len(substitute(getline('.'), '\v[^"]', '', 'g')) % 2) ==1
       let hanging_equals = matchstr(parts[0], '=$\|=\s*$') != ''
     endif
     return next_indented || next_piped || prev_piped || hanging_equals || in_quotes
