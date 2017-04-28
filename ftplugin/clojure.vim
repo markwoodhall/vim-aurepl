@@ -15,10 +15,10 @@ endfunction
 if g:aurepl_eval_on_type == 1
   autocmd InsertEnter * if s:should_bind_as_you_type() | call aurepl#clean_line(0) | endif
   autocmd CursorMoved,CursorMovedI,InsertLeave * if s:should_bind_as_you_type() | call aurepl#clean_line(1) | endif
-  autocmd CursorMoved,CursorMovedI,InsertLeave * if s:should_bind_as_you_type() | silent! call aurepl#expression_to_repl() | endif
+  autocmd CursorMoved,CursorMovedI,InsertLeave * if s:should_bind_as_you_type() | silent! call aurepl#expression_to_repl(1) | endif
 endif
 
-autocmd filetype clojure command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
+autocmd filetype clojure command! -buffer ExpressionToRepl :call aurepl#expression_to_repl(0)
 autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:aurepl_comment_regex_clojure."//g"
 
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && s:should_bind() | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif

@@ -3,15 +3,14 @@ if exists('g:loaded_aurepl') || &cp
 endif
 
 let g:loaded_aurepl = 1
+let g:aurepl_repl_buffer_name = '__REPL__'
 
 let g:aurepl_comment_format = '//='
 let g:aurepl_comment_format_vim = '"@='
 let g:aurepl_comment_regex = '\/\/=\s.*'
 let g:aurepl_comment_regex_vim = '"@=\s.*'
 
-let g:aurepl_repl_buffer_name = '__REPL__'
-
-let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)'
+let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)\|^(range\s*)'
 
 let s:range_added = []
 
@@ -160,7 +159,11 @@ function! aurepl#send_to_repl(line_offset, data)
             silent call fsharpbinding#python#FsiSend(join(e, "\n"))
             silent call fsharpbinding#python#FsiRead(5)
           redir END
-          let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
+          if empty(s:out)
+            let out_array = out_array + ['no-out: Complete with no output']
+          else
+            let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
+          endif
         catch
           let out_array = out_array + [v:exception]
         endtry
@@ -185,6 +188,10 @@ function! s:clean_up()
       execute fromline . "," . toline . "delete" 
     endfor
     let s:range_added = []
+  else
+    let b:winview = winsaveview() 
+    execute "silent! %s/".b:aurepl_comment_regex."//g"
+    call winrestview(b:winview)
   endif
 endfunction
 
@@ -198,7 +205,13 @@ function! aurepl#clean_line(shuffle)
     call setline(current_line, cleaned_line)
     if shuffle
       if substitute(cleaned_line, '\s', '', 'g') == ''
-        call setline(current_line-1, getline(current_line-1) .  comment)
+        if &ft ==# 'fsharp'
+          if matchstr(getline(current_line-1), ';;$') != ''
+            call setline(current_line-1, getline(current_line-1) .  comment)
+          endif
+        else
+          call setline(current_line-1, getline(current_line-1) .  comment)
+        endif
       endif
     endif
   endif
@@ -215,25 +228,25 @@ function! aurepl#selection_to_repl() range
   let &clipboard = old_clipboard
   let firstline = getpos("'<")[1]
   let lastline = getpos("'>")[1]
-  call s:lines_to_repl(firstline, lastline)
+  call s:lines_to_repl(0, firstline, lastline)
 endfunction
 
 function! aurepl#file_to_repl()
-  call s:lines_to_repl(1, line('$'))
+  call s:lines_to_repl(0, 1, line('$'))
 endfunction
 
 function! aurepl#line_to_repl()
-  call s:lines_to_repl(line('.'), line('.'))
+  call s:lines_to_repl(0, line('.'), line('.'))
 endfunction
 
-function! aurepl#expression_to_repl()
+function! aurepl#expression_to_repl(triggered_by_as_you_type)
   if &ft ==# 'clojure'
     let open = '[[{(]'
     let close = '[]})]'
     let [start_line, start_col] = searchpairpos(open, '', close, 'Wrnb')
     let [end_line, end_col] = searchpairpos(open, '', close, 'Wrnc')
     if start_line != 0 && end_line != 0 && start_col != 0 && end_col != 0
-      call s:lines_to_repl(start_line, end_line)
+      call s:lines_to_repl(a:triggered_by_as_you_type, start_line, end_line)
       return
     endif
     if getpos('.') == [0, 1, 1, 0]
@@ -242,18 +255,21 @@ function! aurepl#expression_to_repl()
   endif
   let start_line = 1
   let end_line = line('.')
+  if empty(substitute(getline(end_line), '\s', '', 'g'))
+    return
+  endif
   let counter = end_line
   if matchstr(getline(end_line), b:aurepl_expression_start) != ''
-    call s:lines_to_repl(end_line, line('.'))
+    call s:lines_to_repl(a:triggered_by_as_you_type ,end_line, line('.'))
     return
   endif
   while counter > start_line && matchstr(getline(counter), b:aurepl_expression_start) == ''
     let counter -= 1
   endwhile
-  call s:lines_to_repl(counter, line('.'))
+  call s:lines_to_repl(a:triggered_by_as_you_type, counter, line('.'))
 endfunction
 
-function! s:suppress_line_output(line_number)
+function! s:suppress_line_output(triggered_by_as_you_type, line_number)
   if &ft ==# 'clojure'
     let non_empty_line = (substitute(getline(a:line_number), '\s', '', 'g') != '')
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
@@ -270,42 +286,44 @@ function! s:suppress_line_output(line_number)
 
     return (non_empty_line && (!end_of_expression || !next_line_empty))
   elseif &ft ==# 'fsharp'
+    let next_line = getline(a:line_number+1)
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let trailing_equals = 0
+    let next_empty = 1
+    let next_new_expression = 1
+    let piped = 0
     if len(parts) > 0
       let trailing_equals = matchstr(parts[0], '=$\|=\s*$') != ''
+      let next_empty = empty(next_line)
+      let next_indented = matchstr(next_line, '^\s\s\s\s*.*') != ''
+      let next_new_expression = !next_indented
+      if !a:triggered_by_as_you_type
+        let piped = matchstr(parts[0], '^\s*|>.*\||>.*') != ''
+        let next_piped = matchstr(next_line, '^\s*|>.*\||>.*') != ''
+      endif
     endif
-    return trailing_equals
+    return trailing_equals || (!next_empty && piped) || next_piped || (!next_empty && !next_new_expression)
   else
     return 0
   endif
 endfunction
 
 function! aurepl#supress_eval(line_number)
-  if &ft ==# 'clojure'
-    return matchstr(getline(a:line_number), '^\s*[(\|\[].*[)|\]]$\|^[(\|\[].*[)\|\]]$') == ''
+  let line = getline(a:line_number)
+  let next_line = getline(a:line_number+1)
+  let prev_line = getline(a:line_number-1)
+  if substitute(line, '\s', '', 'g') == ''
+    return 1
   endif
-  if &ft ==# 'fsharp'
-    if substitute(getline(a:line_number), '\s', '', 'g') == ''
-      return 1
-    endif
-    let next_indented = matchstr(getline(a:line_number+1), '^\s\s\s\s*.*') != ''
-    let next_piped = matchstr(getline(a:line_number+1), '^\s*|>.*\||>.*') != ''
-    let prev_piped = matchstr(getline(a:line_number-1), '^\s*|>.*\||>.*') != ''
-    let parts = split(getline(a:line_number), b:aurepl_comment_format) 
-    let hanging_equals = 0
-    let in_quotes = 0
-    if len(parts) > 0
-      let in_quotes = (len(substitute(getline('.'), '\v[^"]', '', 'g')) % 2) ==1
-      let hanging_equals = matchstr(parts[0], '=$\|=\s*$') != ''
-    endif
-    return next_indented || next_piped || prev_piped || hanging_equals || in_quotes
+
+  if &ft ==# 'clojure'
+    return matchstr(line, '^\s*[(\|\[].*[)|\]]$\|^[(\|\[].*[)\|\]]$') == ''
   else
     return 0
   endif
 endfunction
 
-function! s:lines_to_repl(start_line, end_line)
+function! s:lines_to_repl(triggered_by_as_you_type, start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
   let start_offset = a:start_line
   if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
@@ -326,7 +344,7 @@ function! s:lines_to_repl(start_line, end_line)
       let outputs = []
       for m in out
         if m !~ ':\d*:'
-          let outputs = outputs + [m]
+          let outputs = outputs + [m . ' ']
         endif
       endfor
       let m = join(outputs, b:aurepl_comment_format . ' ')
@@ -346,7 +364,7 @@ function! s:lines_to_repl(start_line, end_line)
           let linenumber = matchstr(c, ':\d*:')[1:-2]
           let parts = split(getline(linenumber), b:aurepl_comment_format)
           if len(parts) > 0
-            if g:aurepl_eval_inline_collapse
+            if g:aurepl_eval_inline_collapse && g:aurepl_eval_inline_position != 'bottom'
               let c = c[0:g:aurepl_eval_inline_max]
             endif
             call setline(linenumber, parts[0] . b:aurepl_comment_format .' '.substitute(substitute(c, ':\d*:', '', ''), '^\s*', '', ''))
@@ -355,7 +373,7 @@ function! s:lines_to_repl(start_line, end_line)
       else
         let counter = a:end_line
         for m in reverse(out)
-          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(counter))
+          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(a:triggered_by_as_you_type, counter))
             let counter = counter - 1
           endwhile
           let b:aurepl_last_out[counter] = m
@@ -391,12 +409,14 @@ function! aurepl#repl(repl_type)
 endfunction
 
 function! s:expand_output()
-  let line_number = line('.')
-  let parts = split(getline(line_number), b:aurepl_comment_format)
-  if len(parts) > 0
-    let m = b:aurepl_last_out[line_number]
-    let b:aurepl_expanded += [line_number]
-    call setline(line_number, parts[0] . b:aurepl_comment_format .' '.m)
+  if g:aurepl_eval_inline_position == 'inline' && g:aurepl_eval_inline_collapse
+    let line_number = line('.')
+    let parts = split(getline(line_number), b:aurepl_comment_format)
+    if len(parts) > 0
+      let m = b:aurepl_last_out[line_number]
+      let b:aurepl_expanded += [line_number]
+      call setline(line_number, parts[0] . b:aurepl_comment_format .' '.m)
+    endif
   endif
 endfunction
 
@@ -406,7 +426,6 @@ autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
 autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')
 autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
 autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
-autocmd filetype * command! -buffer ExpressionToRepl :call aurepl#expression_to_repl()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call aurepl#selection_to_repl() | call winrestview(b:winview)
 
 if g:aurepl_eval_inline_collapse
@@ -414,8 +433,7 @@ if g:aurepl_eval_inline_collapse
   autocmd filetype * nnoremap <silent> cpa :ExpandOutput<CR>
 endif
 
-autocmd BufWritePre,BufLeave * silent call s:clean_up()
-autocmd BufWritePre,BufLeave *.vim execute "silent! %s/".g:aurepl_comment_regex_vim."//g"
+autocmd BufWritePre,BufLeave *.cs,*.js,*.vim,*.clj,*.cljs,*.cljc,*.fsx,*.fs,*.fsi silent call s:clean_up()
 
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
