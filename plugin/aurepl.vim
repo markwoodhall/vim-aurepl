@@ -249,7 +249,7 @@ function! aurepl#expression_to_repl(triggered_by_as_you_type)
       call s:lines_to_repl(a:triggered_by_as_you_type, start_line, end_line)
       return
     endif
-    if getpos('.') == [0, 1, 1, 0]
+    if getpos('.')[2:-1] == [1, 0]
       return
     endif
   endif
