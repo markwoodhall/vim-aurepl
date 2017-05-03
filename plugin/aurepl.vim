@@ -426,6 +426,7 @@ autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
 autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')
 autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
 autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
+autocmd filetype * command! -buffer HideOutput :call s:clean_up()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call aurepl#selection_to_repl() | call winrestview(b:winview)
 
 if g:aurepl_eval_inline_collapse
@@ -438,6 +439,7 @@ autocmd BufWritePre,BufLeave *.cs,*.js,*.vim,*.clj,*.cljs,*.cljc,*.fsx,*.fs,*.fs
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
 autocmd filetype * nnoremap <silent> cpl :LineToRepl<CR>
+autocmd filetype * nnoremap <silent> cpo :HideOutput<CR>
 autocmd filetype * vnoremap <silent> cps :SelectionToRepl<CR>
 
 autocmd BufEnter *  let b:aurepl_last_out = {}
