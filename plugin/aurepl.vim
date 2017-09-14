@@ -65,40 +65,6 @@ function! aurepl#send_to_repl(line_offset, data)
       if matchstr(line, '^\s*$')
         let counter += 1
       endif
-      if &ft ==# 'cs' && g:aurepl_eval_inline_position == 'inline' && g:aurepl_eval_inline_cs_experimental == 1
-       if line =~ '^\s*\w*\s*\w*\s*=\s*'
-         let the_var = substitute(line, '^\s*\w*\s*\w*\s*=\s*', '', '')
-         let the_var = the_var[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
-       elseif line =~ '^\s*var\s*\w*\s*=\s*'
-         let the_var = substitute(line, '^\s*var\s*\w*\s*=\s*', '', '')
-         let the_var = the_var[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(' . the_var .  '), '. counter . ');']
-       elseif line =~ 'if (.*' && line !~ 'else if (.*'
-         let the_if = substitute(line, 'if (', '', '')
-         let the_if = the_if[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:→ {0}", ' . the_if . ', '. counter . ');']
-       elseif line =~ 'switch (.*'
-         let the_switch = substitute(line, 'switch (', '', '')
-         let the_switch = the_switch[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:⊃ {0}", ' . the_switch . ', '. counter . ');']
-       elseif line =~ '^\s*Console.WriteLine('
-         let the_evaluation = substitute(line, '^\s*Console.WriteLine(', '', '')
-         let the_evaluation = substitute(the_evaluation, '\s\+$', '', '')
-         let the_evaluation = the_evaluation[0:-3]
-         if the_evaluation =~ '{0}'
-           let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", aurepl_json_serializer.Serialize(string.Format(' . the_evaluation . ')), '. counter . ');']
-         else
-           let clean_data = clean_data + ['Console.WriteLine(":{1}:{0}", ' . (the_evaluation) . '.ToString(), '. counter . ');']
-         endif
-       elseif line =~ '^\w*.;$'
-         let the_evaluation = line[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", aurepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
-       elseif line =~ '^\s*\w*\.\w*.*;' || line =~ '^s*\w*(.*;'
-         let the_evaluation = line[0:-2]
-         let clean_data = clean_data + ['Console.WriteLine(":{1}:≡ {0}", aurepl_json_serializer.Serialize(' . the_evaluation . '), '. counter . ');']
-       endif
-     endif
      let clean_data = clean_data + [line]
      if a:line_offset > 0
        let counter += 1
@@ -326,7 +292,7 @@ endfunction
 function! s:lines_to_repl(triggered_by_as_you_type, start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
   let start_offset = a:start_line
-  if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
+  if &ft ==# 'cs'
     let start_offset -= 1
   endif
   let out = aurepl#send_to_repl(start_offset, lines)
@@ -350,53 +316,31 @@ function! s:lines_to_repl(triggered_by_as_you_type, start_line, end_line)
       let m = join(outputs, b:aurepl_comment_format . ' ')
       call setline(a:end_line, split(getline(a:end_line), b:aurepl_comment_format)[0] . b:aurepl_comment_format .' '.m)
     elseif g:aurepl_eval_inline_position == 'inline'
-      if &ft ==# 'cs' && g:aurepl_eval_inline_cs_experimental == 1
-        let outputs = []
-        let conditions = []
-        for m in out
-          if m =~ ':\d*:'
-            let conditions = conditions + [m]
-          else
-            let outputs = outputs + [m]
-          endif
-        endfor
-        for c in conditions
-          let linenumber = matchstr(c, ':\d*:')[1:-2]
-          let parts = split(getline(linenumber), b:aurepl_comment_format)
-          if len(parts) > 0
-            if g:aurepl_eval_inline_collapse && g:aurepl_eval_inline_position != 'bottom'
-              let c = c[0:g:aurepl_eval_inline_max]
-            endif
-            call setline(linenumber, parts[0] . b:aurepl_comment_format .' '.substitute(substitute(c, ':\d*:', '', ''), '^\s*', '', ''))
-          endif
-        endfor
-      else
-        let counter = a:end_line
-        for m in reverse(out)
-          while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(a:triggered_by_as_you_type, counter))
-            let counter = counter - 1
-          endwhile
-          let b:aurepl_last_out[counter] = m
-          let parts = split(getline(counter), b:aurepl_comment_format)
-          if len(parts) > 0
-            if g:aurepl_eval_inline_collapse
-              if index(b:aurepl_expanded, counter) < 0
-                let m = m[0:g:aurepl_eval_inline_max]
-                let no_space = substitute(m, '\s', '', 'g')
-                if no_space[0] == '(' && no_space[-1:-1] != ')'
-                  let m = m .' ...)'
-                elseif no_space[0] == '{' && no_space[-1:-1] != '}'
-                  let m = m .' ...}'
-                elseif no_space[0] == '[' && no_space[-1:-1] != ']'
-                  let m = m .' ...]'
-                endif
+      let counter = a:end_line
+      for m in reverse(out)
+        while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(a:triggered_by_as_you_type, counter))
+          let counter = counter - 1
+        endwhile
+        let b:aurepl_last_out[counter] = m
+        let parts = split(getline(counter), b:aurepl_comment_format)
+        if len(parts) > 0
+          if g:aurepl_eval_inline_collapse
+            if index(b:aurepl_expanded, counter) < 0
+              let m = m[0:g:aurepl_eval_inline_max]
+              let no_space = substitute(m, '\s', '', 'g')
+              if no_space[0] == '(' && no_space[-1:-1] != ')'
+                let m = m .' ...)'
+              elseif no_space[0] == '{' && no_space[-1:-1] != '}'
+                let m = m .' ...}'
+              elseif no_space[0] == '[' && no_space[-1:-1] != ']'
+                let m = m .' ...]'
               endif
             endif
-            call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
           endif
-          let counter = (counter > a:start_line) ? counter - 1 : counter
-        endfor
-      endif
+          call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
+        endif
+        let counter = (counter > a:start_line) ? counter - 1 : counter
+      endfor
     endif
   else
     let m = join(outputs, b:aurepl_comment_format . ' ')
