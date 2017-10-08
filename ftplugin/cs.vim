@@ -2,6 +2,13 @@ if !exists('g:aurepl_eval_inline_cs_experimental')
   let g:aurepl_eval_inline_cs_experimental = 1
 endif
 
+if !exists('g:aurepl_cs_started')
+  let g:aurepl_cs_output_file = tempname()
+  let g:aurepl_cs_job_id = jobstart('touch ' . g:aurepl_cs_output_file . '; (while [ -f "' . g:aurepl_cs_output_file . '" ]; do sleep 1; done) |  csharp 2>&1 | tee -a ' . g:aurepl_cs_output_file)
+  let g:aurepl_cs_pid = split(system('sleep 5; ps -ef | grep -i "csharp.exe$" | sort +4 | tail -n 1 | grep -o "[0-9]\{1,10\}" | head -n 1'), '\n')[0]
+  let g:aurepl_cs_started = 1
+endif
+
 function! s:TagUnderCursor(tagtype)
   let line = getline('.')
   let line = substitute(line, '##\s', '', 'g')
@@ -94,6 +101,11 @@ function! s:should_bind_as_you_type()
   return should_bind
 endfunction
 
+function! s:clean_up()
+  call system('rm -rf ' . g:aurepl_cs_output_file )
+  call jobstop(g:aurepl_cs_job_id)
+endfunction
+
 autocmd filetype cs command! -buffer Namespaces :exe s:Namespaces()
 autocmd filetype markdown command! -buffer NamespaceUnderCursor :exe s:TagUnderCursor('namespace')
 autocmd filetype markdown command! -buffer TypeUnderCursor :exe s:TagUnderCursor('type')
@@ -113,6 +125,8 @@ autocmd InsertLeave,BufEnter * if s:should_bind() | syn match csEvalSwitch	"//= 
 autocmd InsertLeave,BufEnter * if s:should_bind() | syn match csEvalEvaluation	"//= ≡.*$"  | endif
 autocmd InsertLeave,BufEnter * if s:should_bind() | syn match csEvalError		"//= (\d,\d): error.*$" | endif
 
-autocmd BufEnter * if !exists('b:aurepl_use_command') && s:should_bind()  | let b:aurepl_use_command = 'csharp ./scratch.temp.cs -warn:0' | endif
+autocmd BufEnter * if !exists('b:aurepl_use_command') && s:should_bind() | let b:aurepl_use_command = 'echo ; outputfile=' . g:aurepl_cs_output_file . ';pid=' . g:aurepl_cs_pid . '; echo $(cat ./scratch.temp.cs) > /proc/$pid/fd/0 && sleep 1 && (while [ `tail -n 1 $outputfile | grep -ov "csharp>.*"` ]; do sleep 1; done) && tail -n 1 $outputfile | head -n 1' | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && s:should_bind()  | let b:aurepl_comment_regex = g:aurepl_comment_regex   | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && s:should_bind() | let b:aurepl_comment_format = g:aurepl_comment_format | endif
+
+autocmd VimLeavePre * call s:clean_up()

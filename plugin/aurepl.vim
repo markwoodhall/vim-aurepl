@@ -54,9 +54,6 @@ endfunction
 function! aurepl#send_to_repl(line_offset, data)
   let counter = 1 + a:line_offset
   let clean_data = []
-  if &ft ==# 'cs'
-    let clean_data = ['LoadAssembly("System.Web.Extensions");', 'using System.Web.Script.Serialization;', 'var aurepl_json_serializer = new JavaScriptSerializer();']
-  endif
   for d in a:data
     for line in split(d, '\n')
       if exists('b:aurepl_comment_regex')
@@ -144,6 +141,7 @@ function! aurepl#send_to_repl(line_offset, data)
   for o in out
     let trimmed = trimmed + [substitute(o, '^\s*', '', '')]
   endfor
+  silent! echomsg join(trimmed, "\n")
   return trimmed
 endfunction
 
