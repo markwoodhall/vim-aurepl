@@ -14,9 +14,7 @@ let g:aurepl_eval_on_type = 0
 
 ## Requirements
 
-At the moment this plugin has support for C#, JavaScript, F#, and Clojure. 
-
-The underlying C# evalutation is done using the Mono csharp repl. The JavaScript implementation makes use of `node --eval`. The F# version works on top of the [vim-fsharp](https://github.com/fsharp/vim-fsharp) plugin, and the Clojure integration makes use of [vim-fireplace](https://github.com/tpope/vim-fireplace).
+[vim-fireplace](https://github.com/tpope/vim-fireplace).
 
 ## Installation
 
@@ -41,18 +39,13 @@ let g:aurepl_eval_inline = 0
 :LineToRepl
 ```
 
-![line-to-repl](http://i.imgur.com/1OQb1Dt.gif)
-
 ```viml
 :FileToRepl
 ```
 
-![file-to-repl](http://i.imgur.com/nb0aNJC.gif)
-
 ```viml
 :SelectionToRepl
 ```
-![selection-to-repl](http://i.imgur.com/fD73U3g.gif)
 
 ## License
 Copyright © Mark Woodhall. Distributed under the same terms as Vim itself. See `:help license`

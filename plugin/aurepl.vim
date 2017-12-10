@@ -69,43 +69,10 @@ function! aurepl#send_to_repl(line_offset, data)
     endfor
     let counter += 1
   endfor
-  if exists('b:aurepl_use_command') && executable(split(b:aurepl_use_command, ' ')[0])
-    call writefile(clean_data, 'scratch.temp.'.expand('%:e'))
-    let out = system(b:aurepl_use_command)
-    call delete('scratch.temp.'.expand('%:e'))
-  else
-    if &ft ==# 'vim'
-      let out = s:vim_eval(clean_data)
-    endif
-    if &ft ==# 'clojure'
-      try
-        let expressions = []
-        let out_array = []
-        for d in clean_data
-          if d =~ b:aurepl_expression_start
-            let expressions = expressions + [[d]]
-          else
-            let last_expression = expressions[-1]
-            let last_expression = last_expression + [d]
-            let expressions[-1] = last_expression
-          endif
-        endfor
-        for e in expressions
-          if join(e, '') =~ g:aurepl_warn_on_slow_expressions_regex
-            let out_array = out_array + ['warning: Ignoring infinite expression']
-          else
-            let out_array = out_array + [fireplace#session_eval(join(e, ''), {"ns": "user"})]
-          endif
-        endfor
-        let out = join(out_array, "\n")
-      catch
-        let out = 'error: ' . v:exception
-      endtry
-    endif
-    if &ft ==# 'fsharp'
-      let g:fsharp_echo_all_fsi_output=1
-      let out_array = []
+  if &ft ==# 'clojure'
+    try
       let expressions = []
+      let out_array = []
       for d in clean_data
         if d =~ b:aurepl_expression_start
           let expressions = expressions + [[d]]
@@ -116,25 +83,20 @@ function! aurepl#send_to_repl(line_offset, data)
         endif
       endfor
       for e in expressions
-        try
-          redir => s:out
-            silent call fsharpbinding#python#FsiPurge()
-            silent call fsharpbinding#python#FsiSend(join(e, "\n"))
-            silent call fsharpbinding#python#FsiRead(5)
-          redir END
-          if empty(s:out)
-            let out_array = out_array + ['no-out: Complete with no output']
-          else
-            let out_array = out_array + [substitute(substitute(s:out, "\n", '', 'g'), ';\s*', '; ', '')]
+        if join(e, '') =~ g:aurepl_warn_on_slow_expressions_regex
+          let out_array = out_array + ['warning: Ignoring infinite expression']
+        else
+          let ns = "user"
+          if exists("g:cljreloaded_dev_ns")
+            let ns = g:cljreloaded_dev_ns
           endif
-        catch
-          let out_array = out_array + [v:exception]
-        endtry
-          let s:out = ''
-          let out = join(out_array, "\n")
+          let out_array = out_array + [fireplace#session_eval(join(e, ''), {"ns": ns})]
+        endif
       endfor
-      unlet g:fsharp_echo_all_fsi_output
-    endif
+      let out = join(out_array, "\n")
+    catch
+      let out = 'error: ' . v:exception
+    endtry
   endif
   let out = split(out, "\n")
   let trimmed = []
@@ -169,13 +131,7 @@ function! aurepl#clean_line(shuffle)
     call setline(current_line, cleaned_line)
     if shuffle
       if substitute(cleaned_line, '\s', '', 'g') == ''
-        if &ft ==# 'fsharp'
-          if matchstr(getline(current_line-1), ';;$') != ''
-            call setline(current_line-1, getline(current_line-1) .  comment)
-          endif
-        else
-          call setline(current_line-1, getline(current_line-1) .  comment)
-        endif
+        call setline(current_line-1, getline(current_line-1) .  comment)
       endif
     endif
   endif
@@ -249,24 +205,6 @@ function! s:suppress_line_output(triggered_by_as_you_type, line_number)
     endif
 
     return (non_empty_line && (!end_of_expression || !next_line_empty))
-  elseif &ft ==# 'fsharp'
-    let next_line = getline(a:line_number+1)
-    let parts = split(getline(a:line_number), b:aurepl_comment_format)
-    let trailing_equals = 0
-    let next_empty = 1
-    let next_new_expression = 1
-    let piped = 0
-    if len(parts) > 0
-      let trailing_equals = matchstr(parts[0], '=$\|=\s*$') != ''
-      let next_empty = empty(next_line)
-      let next_indented = matchstr(next_line, '^\s\s\s\s*.*') != ''
-      let next_new_expression = !next_indented
-      if !a:triggered_by_as_you_type
-        let piped = matchstr(parts[0], '^\s*|>.*\||>.*') != ''
-        let next_piped = matchstr(next_line, '^\s*|>.*\||>.*') != ''
-      endif
-    endif
-    return trailing_equals || (!next_empty && piped) || next_piped || (!next_empty && !next_new_expression)
   else
     return 0
   endif
@@ -290,9 +228,6 @@ endfunction
 function! s:lines_to_repl(triggered_by_as_you_type, start_line, end_line)
   let lines = getline(a:start_line, a:end_line)
   let start_offset = a:start_line
-  if &ft ==# 'cs'
-    let start_offset -= 1
-  endif
   let out = aurepl#send_to_repl(start_offset, lines)
   let commented = []
   for m in out
@@ -362,10 +297,7 @@ function! s:expand_output()
   endif
 endfunction
 
-autocmd filetype * command! -buffer CsRepl :exe aurepl#repl('cs')
 autocmd filetype * command! -buffer ClojureRepl :exe aurepl#repl('clj')
-autocmd filetype * command! -buffer FsRepl :exe aurepl#repl('fsx')
-autocmd filetype * command! -buffer JsRepl :exe aurepl#repl('js')
 autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
 autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
 autocmd filetype * command! -buffer HideOutput :call s:clean_up()
@@ -376,7 +308,7 @@ if g:aurepl_eval_inline_collapse
   autocmd filetype * nnoremap <silent> cpa :ExpandOutput<CR>
 endif
 
-autocmd BufWritePre,BufLeave *.cs,*.js,*.vim,*.clj,*.cljs,*.cljc,*.fsx,*.fs,*.fsi silent call s:clean_up()
+autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc silent call s:clean_up()
 
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
@@ -387,20 +319,6 @@ autocmd filetype * vnoremap <silent> cps :SelectionToRepl<CR>
 autocmd BufEnter *  let b:aurepl_last_out = {}
 autocmd BufEnter *  let b:aurepl_expanded = []
 
-autocmd BufEnter * if !exists('b:aurepl_comment_format') && &ft ==# 'vim' | let b:aurepl_comment_format = g:aurepl_comment_format_vim | endif
-autocmd BufEnter * if !exists('b:aurepl_comment_regex') && &ft ==# 'vim' | let b:aurepl_comment_regex = g:aurepl_comment_regex_vim | endif
-
-autocmd InsertLeave,BufEnter * if &ft ==# 'vim' | syn match csEval	"\"\"= .*$"| endif
-autocmd InsertLeave,BufEnter * if &ft ==# 'vim' | syn match csEvalError		"\"\"= .*$" | endif
-
-autocmd InsertLeave,BufEnter * syn match csZshError "//= zsh:\d: .*$"
-autocmd InsertLeave,BufEnter * syn match csBashError "//= bash:\d: .*$"
-
 autocmd BufEnter * hi csEval guifg=#fff guibg=#03525F
-autocmd BufEnter * hi csEvalIf guifg=#fff guibg=#5D0089
-autocmd BufEnter * hi csEvalSwitch guifg=#fff guibg=#5F9181
-autocmd BufEnter * hi csEvalEvaluation guifg=#fff guibg=#3F3591
 autocmd BufEnter * hi csEvalError guifg=#fff guibg=#8B1A37
 autocmd BufEnter * hi csEvalWarn guifg=#fff guibg=#8C7A37
-autocmd BufEnter * hi csZshError guibg=#fff guibg=#8B1A37
-autocmd BufEnter * hi csBashError guibg=#fff guibg=#8B1A37
