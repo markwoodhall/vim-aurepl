@@ -285,6 +285,7 @@ endfunction
 
 function! aurepl#repl(repl_type)
   execute 'vsplit ' g:aurepl_repl_buffer_name . '.' . a:repl_type
+  execute 'set buftype=nofile'
 endfunction
 
 function! s:expand_output()
