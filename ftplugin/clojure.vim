@@ -1,6 +1,6 @@
 let g:aurepl_comment_format_clojure = ';;='
 let g:aurepl_comment_regex_clojure = ';;=\s.*'
-let g:aurepl_expression_start_clojure = '^(\|^\['
+let g:aurepl_expression_start_clojure = '^(\|^\[\|^{'
 
 let g:aurepl_default_ns_clojure = 'user'
 

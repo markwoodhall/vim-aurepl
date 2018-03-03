@@ -5,14 +5,7 @@ endif
 let g:loaded_aurepl = 1
 let g:aurepl_repl_buffer_name = '__REPL__'
 
-let g:aurepl_comment_format = '//='
-let g:aurepl_comment_format_vim = '"@='
-let g:aurepl_comment_regex = '\/\/=\s.*'
-let g:aurepl_comment_regex_vim = '"@=\s.*'
-
 let g:aurepl_warn_on_slow_expressions_regex = '^\s(range)\|^(range)\|^(range\s*)'
-
-let s:range_added = []
 
 if !exists('g:aurepl_eval_inline')
   let g:aurepl_eval_inline = 1
@@ -33,19 +26,6 @@ endif
 if !exists('g:aurepl_eval_on_type_in_all_buffers')
   let g:aurepl_eval_on_type_in_all_buffers = 0
 endif
-
-function! s:vim_eval(data)
-  let out = ''
-  for d in a:data
-    try
-      let d = eval(d)
-      let out = out . string(d) . "\n"
-    catch
-      let out = out . 'error ' . v:exception . "\n"
-    endtry  
-  endfor
-  return out
-endfunction
 
 function! aurepl#send_to_repl(line_offset, data)
   let counter = 1 + a:line_offset
@@ -184,7 +164,7 @@ function! s:suppress_line_output(triggered_by_as_you_type, line_number)
     let parts = split(getline(a:line_number), b:aurepl_comment_format)
     let end_of_expression = 0
     if len(parts) > 0
-      let end_of_expression = (matchstr(parts[0], ')$\|)\s*$') != '')
+      let end_of_expression = (matchstr(parts[0], ')$\|)\s*$\|}$') != '')
     endif
 
     let next_parts = split(getline(a:line_number+1), b:aurepl_comment_format)
@@ -208,7 +188,7 @@ function! aurepl#supress_eval(line_number)
   endif
 
   if &ft ==# 'clojure'
-    return matchstr(line, '^\s*[(\|\[].*[)|\]]$\|^[(\|\[].*[)\|\]]$') == ''
+    return matchstr(line, '^\s*[(\|\[]\|{.*[)|\}|\]]$\|^[(\|\|{\[].*[)\|}\|\]]$') == ''
   else
     return 0
   endif
