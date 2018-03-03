@@ -18,10 +18,6 @@ if !exists('g:aurepl_eval_inline')
   let g:aurepl_eval_inline = 1
 endif
 
-if !exists('g:aurepl_eval_inline_position')
-  let g:aurepl_eval_inline_position = 'inline'
-endif
-
 if !exists('g:aurepl_eval_inline_collapse')
   let g:aurepl_eval_inline_collapse = 1
 endif
@@ -103,24 +99,15 @@ function! aurepl#send_to_repl(line_offset, data)
   for o in out
     let trimmed = trimmed + [substitute(o, '^\s*', '', '')]
   endfor
-  silent! echomsg join(trimmed, "\n")
   return trimmed
 endfunction
 
 function! aurepl#clean_up()
-  if g:aurepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
-    for r in reverse(s:range_added)
-      let [fromline, toline] = r
-      execute fromline . "," . toline . "delete" 
-    endfor
-    let s:range_added = []
-  else
-    let b:winview = winsaveview() 
-    if exists('b:aurepl_comment_regex')
-      execute "silent! %s/".b:aurepl_comment_regex."//g"
-    endif
-    call winrestview(b:winview)
+  let b:winview = winsaveview() 
+  if exists('b:aurepl_comment_regex')
+    execute "silent! %s/".b:aurepl_comment_regex."//g"
   endif
+  call winrestview(b:winview)
 endfunction
 
 function! aurepl#clean_line(shuffle)
@@ -236,47 +223,31 @@ function! s:lines_to_repl(triggered_by_as_you_type, start_line, end_line)
     let commented = commented + [b:aurepl_comment_format .' '.m]
   endfor
   if g:aurepl_eval_inline
-    if g:aurepl_eval_inline_position == 'bottom'
-      if len(commented) > 0
-        let s:range_added = s:range_added + [[a:end_line+1, a:end_line+len(out)]]
-        call append(a:end_line, commented)
-      endif
-    elseif g:aurepl_eval_inline_position == 'lastline'
-      let outputs = []
-      for m in out
-        if m !~ ':\d*:'
-          let outputs = outputs + [m . ' ']
-        endif
-      endfor
-      let m = join(outputs, b:aurepl_comment_format . ' ')
-      call setline(a:end_line, split(getline(a:end_line), b:aurepl_comment_format)[0] . b:aurepl_comment_format .' '.m)
-    elseif g:aurepl_eval_inline_position == 'inline'
-      let counter = a:end_line
-      for m in reverse(out)
-        while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(a:triggered_by_as_you_type, counter))
-          let counter = counter - 1
-        endwhile
-        let b:aurepl_last_out[counter] = m
-        let parts = split(getline(counter), b:aurepl_comment_format)
-        if len(parts) > 0
-          if g:aurepl_eval_inline_collapse
-            if index(b:aurepl_expanded, counter) < 0
-              let m = m[0:g:aurepl_eval_inline_max]
-              let no_space = substitute(m, '\s', '', 'g')
-              if no_space[0] == '(' && no_space[-1:-1] != ')'
-                let m = m .' ...)'
-              elseif no_space[0] == '{' && no_space[-1:-1] != '}'
-                let m = m .' ...}'
-              elseif no_space[0] == '[' && no_space[-1:-1] != ']'
-                let m = m .' ...]'
-              endif
+    let counter = a:end_line
+    for m in reverse(out)
+      while counter > a:start_line && ((substitute(getline(counter), '\s', '', 'g') == '') || s:suppress_line_output(a:triggered_by_as_you_type, counter))
+        let counter = counter - 1
+      endwhile
+      let b:aurepl_last_out[counter] = m
+      let parts = split(getline(counter), b:aurepl_comment_format)
+      if len(parts) > 0
+        if g:aurepl_eval_inline_collapse
+          if index(b:aurepl_expanded, counter) < 0
+            let m = m[0:g:aurepl_eval_inline_max]
+            let no_space = substitute(m, '\s', '', 'g')
+            if no_space[0] == '(' && no_space[-1:-1] != ')'
+              let m = m .' ...)'
+            elseif no_space[0] == '{' && no_space[-1:-1] != '}'
+              let m = m .' ...}'
+            elseif no_space[0] == '[' && no_space[-1:-1] != ']'
+              let m = m .' ...]'
             endif
           endif
-          call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
         endif
-        let counter = (counter > a:start_line) ? counter - 1 : counter
-      endfor
-    endif
+        call setline(counter, parts[0] . b:aurepl_comment_format .' '.m)
+      endif
+      let counter = (counter > a:start_line) ? counter - 1 : counter
+    endfor
   else
     let m = join(outputs, b:aurepl_comment_format . ' ')
     echomsg m
@@ -289,7 +260,7 @@ function! aurepl#repl(repl_type)
 endfunction
 
 function! s:expand_output()
-  if g:aurepl_eval_inline_position == 'inline' && g:aurepl_eval_inline_collapse
+  if g:aurepl_eval_inline_collapse
     let line_number = line('.')
     let parts = split(getline(line_number), b:aurepl_comment_format)
     if len(parts) > 0
