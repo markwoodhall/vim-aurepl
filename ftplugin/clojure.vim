@@ -2,6 +2,8 @@ let g:aurepl_comment_format_clojure = ';;='
 let g:aurepl_comment_regex_clojure = ';;=\s.*'
 let g:aurepl_expression_start_clojure = '^(\|^\['
 
+let g:aurepl_default_ns_clojure = 'user'
+
 function! s:should_bind()
   return &ft ==# 'clojure'
 endfunction
@@ -19,7 +21,7 @@ endif
 autocmd InsertEnter * if s:should_bind() | call aurepl#clean_line(0) | endif
 
 autocmd filetype clojure command! -buffer ExpressionToRepl :call aurepl#expression_to_repl(0)
-autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc execute "silent! %s/".g:aurepl_comment_regex_clojure."//g"
+autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc :call aurepl#clean_up()
 
 autocmd BufEnter * if !exists('b:aurepl_comment_format') && s:should_bind() | let b:aurepl_comment_format = g:aurepl_comment_format_clojure | endif
 autocmd BufEnter * if !exists('b:aurepl_comment_regex') && s:should_bind()  | let b:aurepl_comment_regex = g:aurepl_comment_regex_clojure   | endif

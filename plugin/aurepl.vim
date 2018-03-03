@@ -86,7 +86,7 @@ function! aurepl#send_to_repl(line_offset, data)
         if join(e, '') =~ g:aurepl_warn_on_slow_expressions_regex
           let out_array = out_array + ['warning: Ignoring infinite expression']
         else
-          let ns = "user"
+          let ns = g:aurepl_default_ns_clojure
           if exists("g:cljreloaded_dev_ns")
             let ns = g:cljreloaded_dev_ns
           endif
@@ -107,7 +107,7 @@ function! aurepl#send_to_repl(line_offset, data)
   return trimmed
 endfunction
 
-function! s:clean_up()
+function! aurepl#clean_up()
   if g:aurepl_eval_inline_position == 'bottom' && len(s:range_added) >= 1
     for r in reverse(s:range_added)
       let [fromline, toline] = r
@@ -116,7 +116,9 @@ function! s:clean_up()
     let s:range_added = []
   else
     let b:winview = winsaveview() 
-    execute "silent! %s/".b:aurepl_comment_regex."//g"
+    if exists('b:aurepl_comment_regex')
+      execute "silent! %s/".b:aurepl_comment_regex."//g"
+    endif
     call winrestview(b:winview)
   endif
 endfunction
@@ -300,15 +302,13 @@ endfunction
 autocmd filetype * command! -buffer ClojureRepl :exe aurepl#repl('clj')
 autocmd filetype * command! -buffer FileToRepl :call aurepl#file_to_repl()
 autocmd filetype * command! -buffer LineToRepl :call aurepl#line_to_repl()
-autocmd filetype * command! -buffer HideOutput :call s:clean_up()
+autocmd filetype * command! -buffer HideOutput :call aurepl#clean_up()
 autocmd filetype * command! -buffer -range SelectionToRepl let b:winview = winsaveview() | call aurepl#selection_to_repl() | call winrestview(b:winview)
 
 if g:aurepl_eval_inline_collapse
   autocmd filetype * command! -buffer ExpandOutput :call s:expand_output()
   autocmd filetype * nnoremap <silent> cpa :ExpandOutput<CR>
 endif
-
-autocmd BufWritePre,BufLeave *.clj,*.cljs,*.cljc silent call s:clean_up()
 
 autocmd filetype * nnoremap <silent> cpf :FileToRepl<CR>
 autocmd filetype * nnoremap <silent> cpe :ExpressionToRepl<CR>
