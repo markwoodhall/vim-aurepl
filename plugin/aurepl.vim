@@ -10,7 +10,6 @@ let g:aurepl_namespace = nvim_create_namespace('aurepl')
 
 
 function! aurepl#send_to_repl(expression)
-  echomsg a:expression
   if &ft ==# 'clojure'
     try
       let expressions = [a:expression]
@@ -84,10 +83,6 @@ function! aurepl#selection_to_repl() range
   call setreg('"', old_reg, old_regtype)
   let &clipboard = old_clipboard
   call s:lines_to_repl(selection)
-endfunction
-
-function! aurepl#file_to_repl()
-  call s:lines_to_repl(join(getline(0, '$'), '\n'))
 endfunction
 
 function! aurepl#line_to_repl()
