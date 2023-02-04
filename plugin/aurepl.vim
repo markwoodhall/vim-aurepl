@@ -8,8 +8,7 @@ let g:aurepl_repl_buffer_name = '__REPL__'
 let g:aurepl_warn_on_slow_expressions_regex = '(range\s*)\|(range)'
 let g:aurepl_namespace = nvim_create_namespace('aurepl')
 
-
-function! aurepl#send_to_repl(expression)
+function! s:send_to_repl(expression)
   if &ft ==# 'clojure'
     try
       let expressions = [a:expression]
@@ -38,7 +37,7 @@ function! aurepl#send_to_repl(expression)
   return trimmed
 endfunction
 
-function! aurepl#clean_up()
+function! s:clean_up()
   let bnr = bufnr('%')
   let counter = 1
   for line in getline(0, '$')
@@ -47,49 +46,7 @@ function! aurepl#clean_up()
   endfor
 endfunction
 
-function aurepl#get_expression()
-  if &ft ==# 'clojure'
-    let open = '[[{(]'
-    let close = '[]})]'
-    let [line1, col1] = searchpairpos(open, '', close, 'bcrn', g:fireplace#skip)
-    let [line2, col2] = searchpairpos(open, '', close, 'rn', g:fireplace#skip)
-    if !line1 && !line2
-      let [line1, col1] = searchpairpos(open, '', close, 'brn', g:fireplace#skip)
-      let [line2, col2] = searchpairpos(open, '', close, 'crn', g:fireplace#skip)
-    endif
-    while col1 > 1 && getline(line1)[col1-2] =~# '[#''`~@]'
-      let col1 -= 1
-    endwhile
-    if !line1 || !line2
-      return ''
-    endif
-    if line1 == line2
-      return getline(line1)[col1-1 : col2-1]
-    else
-      return getline(line1)[col1-1 : -1] . "\n"
-            \ . join(map(getline(line1+1, line2-1), 'v:val . "\n"'))
-            \ . getline(line2)[0 : col2-1]
-    endif
-  endif
-endfunction
-
-function! aurepl#selection_to_repl() range
-  let old_reg = getreg('"')
-  let old_regtype = getregtype('"')
-  let old_clipboard = &clipboard
-  set clipboard&
-  silent normal! ""gvy
-  let selection = getreg('"')
-  call setreg('"', old_reg, old_regtype)
-  let &clipboard = old_clipboard
-  call s:lines_to_repl(selection)
-endfunction
-
-function! aurepl#line_to_repl()
-  call s:lines_to_repl(join(getline('.', '.'), '\n'))
-endfunction
-
-function! aurepl#expression_to_repl()
+function! s:expression_to_repl()
   let sel_save = &selection
   let cb_save = &clipboard
   let reg_save = @@
@@ -118,12 +75,12 @@ function! aurepl#expression_to_repl()
   endtry
 endfunction
 
-function! aurepl#typed_to_repl()
-  call s:lines_to_repl(aurepl#get_expression())
+function! s:line_to_repl()
+  call s:lines_to_repl(join(getline('.', '.'), '\n'))
 endfunction
 
 function! s:lines_to_repl(expression)
-  let out = aurepl#send_to_repl(a:expression)
+  let out = s:send_to_repl(a:expression)
   for m in reverse(out)
     let syntax_group = 'csEval'
     if m =~ 'warning:'
@@ -143,10 +100,9 @@ function! s:lines_to_repl(expression)
   endfor
 endfunction
 
-function! aurepl#repl(repl_type)
-  execute 'vsplit ' g:aurepl_repl_buffer_name . '.' . a:repl_type
-  execute 'set buftype=nofile'
-endfunction
+autocmd FileType clojure command! -buffer ExpressionToRepl :call s:expression_to_repl()
+autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
+autocmd FileType clojure command! -buffer LineToRepl :call s:line_to_repl()
 
 autocmd BufEnter * hi csEval guifg=#4a4e56 guibg=#2cda9d
 autocmd BufEnter * hi csEvalError guifg=#4a4e56 guibg=#fb7da7
