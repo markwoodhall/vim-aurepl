@@ -151,6 +151,6 @@ autocmd FileType clojure command! -buffer RootToRepl :call s:root_to_repl(<line1
 autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
 autocmd FileType clojure command! -buffer LineToRepl :call s:line_to_repl()
 
-autocmd BufEnter * hi csEval guifg=#ccc guibg=#658168
-autocmd BufEnter * hi csEvalError guifg=#ccc guibg=#895768
-autocmd BufEnter * hi csEvalWarn guifg=#ccc guibg=#eed49f
+autocmd BufEnter *.clj,*.clj[cs] hi csEval guifg=#ccc guibg=#658168
+autocmd BufEnter *.clj,*.clj[cs] hi csEvalError guifg=#ccc guibg=#895768
+autocmd BufEnter *.clj,*.clj[cs] hi csEvalWarn guifg=#ccc guibg=#eed49f
