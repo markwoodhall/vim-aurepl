@@ -22,6 +22,9 @@ function! s:send_to_repl(expression)
           if exists("g:cljreloaded_dev_ns")
             let ns = g:cljreloaded_dev_ns
           endif
+          if exists("b:cljreloaded_dev_ns")
+            let ns = b:cljreloaded_dev_ns
+          endif
           redir => s:out
           silent call fireplace#echo_session_eval(join(split(e, '\\n'), ' '), {"ns": ns})
           redir END
@@ -150,6 +153,8 @@ autocmd FileType clojure command! -buffer ExpressionToRepl :call s:expression_to
 autocmd FileType clojure command! -buffer RootToRepl :call s:root_to_repl(<line1>, <count>)
 autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
 autocmd FileType clojure command! -buffer LineToRepl :call s:line_to_repl()
+
+autocmd CursorMoved *.clj,*.clj[cs] call s:clean_up()
 
 autocmd BufEnter *.clj,*.clj[cs] hi csEval guifg=#ccc guibg=#658168
 autocmd BufEnter *.clj,*.clj[cs] hi csEvalError guifg=#ccc guibg=#895768
