@@ -5,7 +5,16 @@ endif
 let g:loaded_aurepl = 1
 let g:aurepl_repl_buffer_name = '__REPL__'
 
-let g:aurepl_warn_on_slow_expressions_regex = '(range\s*)\|(range)'
+if !exists('g:aurepl_eval_on_type')
+  let g:aurepl_eval_on_type = 0
+endif
+if !exists('g:aurepl_clean_on_move')
+let g:aurepl_clean_on_move = 1
+endif
+
+"(repeat 10)
+"(repeat 10 :a)
+let g:aurepl_warn_on_slow_expressions_regex = '(range\s*)\|(range)\|(repeat)\|(repeat\s*)\|(repeat\s*)\|(repeat\s*\w*)\|(repeat\s*\w*\s*)'
 let g:aurepl_namespace = nvim_create_namespace('aurepl')
 
 function! s:send_to_repl(expression)
@@ -127,11 +136,7 @@ function! s:lines_to_repl(expression, endline)
       let syntax_group = 'csEvalWarn'
     endif
 
-    if m =~ 'error:'
-      let syntax_group = 'csEvalError'
-    endif
-
-    if m =~ 'Syntax error'
+    if m =~ 'error:' || m =~ 'Execution error' || m =~ 'Syntax error'
       let syntax_group = 'csEvalError'
     endif
 
@@ -154,8 +159,9 @@ autocmd FileType clojure command! -buffer RootToRepl :call s:root_to_repl(<line1
 autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
 autocmd FileType clojure command! -buffer LineToRepl :call s:line_to_repl()
 
-autocmd CursorMoved *.clj,*.clj[cs] call s:clean_up()
+autocmd CursorMoved *.clj,*.clj[cs] if g:aurepl_clean_on_move == 1 | call s:clean_up() | endif
+autocmd CursorMovedI *.clj,*.clj[cs] if g:aurepl_eval_on_type == 1 | call s:root_to_repl(0, -1) | endif
 
 autocmd BufEnter *.clj,*.clj[cs] hi csEval guifg=#ccc guibg=#658168
 autocmd BufEnter *.clj,*.clj[cs] hi csEvalError guifg=#ccc guibg=#895768
-autocmd BufEnter *.clj,*.clj[cs] hi csEvalWarn guifg=#ccc guibg=#eed49f
+autocmd BufEnter *.clj,*.clj[cs] hi csEvalWarn guifg=#ccc guibg=#333
