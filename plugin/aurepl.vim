@@ -9,16 +9,15 @@ if !exists('g:aurepl_eval_on_type')
   let g:aurepl_eval_on_type = 0
 endif
 if !exists('g:aurepl_clean_on_move')
-let g:aurepl_clean_on_move = 1
+let g:aurepl_clean_on_move = 0
 endif
 
-"(repeat 10)
-"(repeat 10 :a)
 let g:aurepl_warn_on_slow_expressions_regex = '(range\s*)\|(range)\|(repeat)\|(repeat\s*)\|(repeat\s*)\|(repeat\s*\w*)\|(repeat\s*\w*\s*)'
 let g:aurepl_namespace = nvim_create_namespace('aurepl')
 
 function! s:send_to_repl(expression)
   let out = ''
+  let out_array = []
   if &ft ==# 'clojure'
     try
       let expressions = [a:expression]
@@ -35,22 +34,16 @@ function! s:send_to_repl(expression)
             let ns = b:cljreloaded_dev_ns
           endif
           redir => s:out
-          silent call fireplace#echo_session_eval(join(split(e, '\\n'), ' '), {"ns": ns})
+           silent call fireplace#echo_session_eval(join(split(e, '\\n'), ' '), {"ns": ns})
           redir END
           let out_array = out_array + split(s:out, '\n')
         endif
       endfor
-      let out = join(out_array, " ")
     catch
-      let out = 'error: ' . string(v:exception)
+      let out_array = ['error: ' . string(v:exception)]
     endtry
   endif
-  let out = split(out, "\\n")
-  let trimmed = []
-  for o in out
-    let trimmed = trimmed + [substitute(o, '^\s*', '', '')]
-  endfor
-  return trimmed
+  return out_array
 endfunction
 
 function! s:clean_up()
@@ -60,9 +53,12 @@ function! s:clean_up()
     call nvim_buf_del_extmark(bnr, g:aurepl_namespace, counter)
     let counter = counter + 1
   endfor
+  call nvim_win_close(g:aurepl_window, v:true)
 endfunction
 
 function! s:expression_to_repl()
+  let original_clean = g:aurepl_clean_on_move
+  let g:aurepl_clean_on_move = 0
   let sel_save = &selection
   let cb_save = &clipboard
   let reg_save = @@
@@ -88,6 +84,7 @@ function! s:expression_to_repl()
     let @@ = reg_save
     let &selection = sel_save
     let &clipboard = cb_save
+    let g:aurepl_clean_on_move = 0
   endtry
 endfunction
 
@@ -128,36 +125,45 @@ function! s:line_to_repl()
   call s:lines_to_repl(join(getline('.', '.'), '\n'), getpos('.')[1])
 endfunction
 
+function! s:buf_to_repl()
+  call s:lines_to_repl(join(getline('^', '$'), '\n'), getpos('$')[1])
+endfunction
+
 function! s:lines_to_repl(expression, endline)
   let out = s:send_to_repl(a:expression)
-  for m in reverse(out)
-    let syntax_group = 'csEval'
-    if m =~ 'warning:'
-      let syntax_group = 'csEvalWarn'
+  let buff = nvim_create_buf(v:false, v:true)
+  let height = len(out)
+  let width = 0
+
+  for i in out
+    let length = len(i)
+    if length > width
+      let width = length
     endif
-
-    if m =~ 'error:' || m =~ 'Execution error' || m =~ 'Syntax error'
-      let syntax_group = 'csEvalError'
-    endif
-
-    if m =~ 'No available JS runtime'
-      let syntax_group = 'csEvalError'
-    endif
-
-    let offset = len(split(a:expression, "\\n")) - 1
-
-    let bnr = bufnr('%')
-    let counter = a:endline
-    call nvim_buf_del_extmark(bnr, g:aurepl_namespace, counter)
-    call nvim_buf_set_extmark(bnr, g:aurepl_namespace, counter-1, 0, {'id': counter, 'virt_text_pos': 'eol', 'virt_text': [[m, syntax_group]]})
   endfor
+
+  if width > 180
+    let width = 180
+  else
+    let width = width + 6
+  endif
+
+  if height > 30
+    let height = 30
+  endif
+
+  let g:aurepl_window = nvim_open_win(buff, v:true, {'relative': 'cursor', 'row': -1, 'col': 1, 'width': width, 'height': height, 'border': 'rounded'})
+
+  call nvim_buf_set_option(buff, 'filetype', 'clojure')
+  call nvim_buf_set_lines(buff, 0, -1, v:false, out)
 endfunction
 
 autocmd FileType clojure command! -buffer ExpressionToRepl :call s:expression_to_repl()
-
 autocmd FileType clojure command! -buffer RootToRepl :call s:root_to_repl(<line1>, <count>)
-autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
 autocmd FileType clojure command! -buffer LineToRepl :call s:line_to_repl()
+autocmd FileType clojure command! -buffer BufToRepl :call s:buf_to_repl()
+
+autocmd FileType clojure command! -buffer ExpressionHide :call s:clean_up()
 
 autocmd CursorMoved *.clj,*.clj[cs] if g:aurepl_clean_on_move == 1 | call s:clean_up() | endif
 autocmd CursorMovedI *.clj,*.clj[cs] if g:aurepl_eval_on_type == 1 | call s:root_to_repl(0, -1) | endif
