@@ -152,7 +152,7 @@ function! s:lines_to_repl(expression, endline)
     let height = 30
   endif
 
-  let g:aurepl_window = nvim_open_win(buff, v:true, {'relative': 'cursor', 'row': -1, 'col': 1, 'width': width, 'height': height, 'border': 'rounded'})
+  let g:aurepl_window = nvim_open_win(buff, v:true, {'relative': 'cursor', 'row': -1, 'col': 1, 'width': width, 'height': height, 'border': 'none'})
 
   call nvim_buf_set_option(buff, 'filetype', 'clojure')
   call nvim_buf_set_lines(buff, 0, -1, v:false, out)
